@@ -110,13 +110,15 @@ export default function Sidebar() {
         width: isSidebarOpen ? '250px' : '90px',
       }}
       transition={{ duration: 0.1, ease: 'easeOut' }}
-      className="
-        fixed top-0 left-0 h-screen p-4 z-30
+      className={`
+        fixed top-0 left-0 z-30 h-screen p-4
         bg-light-card dark:bg-dark-card
         border-r border-primary/10
         shadow-soft dark:shadow-strong
-        transition-all duration-300
-      "
+        transition-all duration-300 transform
+        ${sidebar ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0
+      `}
+      style={{ width: isSidebarOpen ? '250px' : '90px' }}
     >
       <div
         className={`absolute -right-4 top-4 transition-opacity duration-300 ${

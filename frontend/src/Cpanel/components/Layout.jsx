@@ -24,6 +24,15 @@ export default function Layout({ children }) {
 
         <Footer />
       </div>
+
+      {sidebar ? (
+        <button
+          type="button"
+          aria-label="Close sidebar overlay"
+          onClick={handleSidebar}
+          className="fixed inset-0 z-20 bg-black/40 md:hidden"
+        />
+      ) : null}
     </div>
   );
 }

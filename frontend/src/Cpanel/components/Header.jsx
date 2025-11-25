@@ -31,7 +31,18 @@ export default function Header({ onMenuClick }) {
           </svg>
         </button>
 
-        <div className="relative w-full max-w-md md:max-w-lg">
+        <button
+          type="button"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-accent-bg text-ink hover:border-[rgba(2,159,174,0.35)] hover:text-primary dark:bg-dark-hover dark:text-text-light md:hidden"
+          aria-label="Search"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="6" />
+            <path d="m16.5 16.5 2.5 2.5" strokeLinecap="round" />
+          </svg>
+        </button>
+
+        <div className="relative hidden w-full max-w-md md:max-w-lg md:block">
           <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted">
             <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]" fill="none" stroke="currentColor" strokeWidth="1.8">
               <circle cx="11" cy="11" r="6" />
@@ -41,7 +52,7 @@ export default function Header({ onMenuClick }) {
           <input
             type="search"
             placeholder="Search orders, customers, invoices..."
-            className="w-full rounded-xl border border-border bg-accent-bg px-9 py-1.5 text-sm text-ink placeholder:text-muted/70 outline-none ring-2 ring-transparent transition focus:border-[rgba(2,159,174,0.35)] focus:ring-[rgba(2,159,174,0.15)] dark:bg-dark-hover dark:text-text-light"
+            className="w-full h-10 rounded-xl border border-border bg-accent-bg px-10 text-sm text-ink placeholder:text-muted/70 outline-none ring-2 ring-transparent transition focus:border-[rgba(2,159,174,0.35)] focus:ring-[rgba(2,159,174,0.15)] dark:bg-dark-hover dark:text-text-light"
           />
         </div>
 
@@ -49,23 +60,18 @@ export default function Header({ onMenuClick }) {
           <button
             type="button"
             onClick={() => setIsDark((prev) => !prev)}
-            className="relative inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-accent-bg px-3 text-sm font-semibold text-ink transition hover:border-[rgba(2,159,174,0.35)] hover:text-primary dark:bg-dark-hover dark:text-text-light"
+            className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-accent-bg text-ink transition hover:border-[rgba(2,159,174,0.35)] hover:text-primary dark:bg-dark-hover dark:text-text-light"
+            aria-label="Toggle theme"
           >
             {isDark ? (
-              <>
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <path d="M20 12.5A8.5 8.5 0 1 1 11.5 4a6.5 6.5 0 0 0 8.5 8.5Z" />
-                </svg>
-                Dark
-              </>
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M20 12.5A8.5 8.5 0 1 1 11.5 4a6.5 6.5 0 0 0 8.5 8.5Z" />
+              </svg>
             ) : (
-              <>
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <circle cx="12" cy="12" r="5" />
-                  <path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5 3.5 3.5M18.5 18.5 20 20M5 19l-1.5 1.5M19 5l1.5-1.5" strokeLinecap="round" />
-                </svg>
-                Light
-              </>
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <circle cx="12" cy="12" r="5" />
+                <path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5 3.5 3.5M18.5 18.5 20 20M5 19l-1.5 1.5M19 5l1.5-1.5" strokeLinecap="round" />
+              </svg>
             )}
           </button>
 
