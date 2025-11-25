@@ -1,0 +1,95 @@
+import express from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
+import config from './config/env.js';
+import customerAuthRoutes from './routes/customer/authRoutes.js';
+import employeeAuthRoutes from './routes/employee/authRoutes.js';
+import customerProfileRoutes from './routes/customer/profileRoutes.js';
+import employeeProfileRoutes from './routes/employee/profileRoutes.js';
+import customerSessionRoutes from './routes/customer/sessionRoutes.js';
+import employeeSessionRoutes from './routes/employee/sessionRoutes.js';
+import { csrfSkip, csrfErrorHandler } from './middleware/csrf.js';
+import adminRoutes from './routes/employee/adminRoutes.js';
+import customerAddressRoutes from './routes/customer/addressRoutes.js';
+import customerNotificationRoutes from './routes/customer/notificationRoutes.js';
+import employeeNotificationRoutes from './routes/employee/notificationRoutes.js';
+import employeeCategoryRoutes from './routes/employee/categoryRoutes.js';
+import employeeProductRoutes from './routes/employee/productRoutes.js';
+import catalogProductRoutes from './routes/catalog/productRoutes.js';
+import employeeMediaRoutes from './routes/employee/mediaRoutes.js';
+import customerWishlistRoutes from './routes/customer/wishlistRoutes.js';
+import customerCartRoutes from './routes/customer/cartRoutes.js';
+import customerOrderRoutes from './routes/customer/orderRoutes.js';
+import employeeOrderRoutes from './routes/employee/orderRoutes.js';
+
+const app = express();
+
+app.use(helmet());
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    credentials: true,
+  })
+);
+app.use(express.json());
+app.use(cookieParser());
+app.use(csrfSkip);
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
+app.use('/auth', authLimiter);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+// Auth routes
+app.use('/auth/customer', customerAuthRoutes);
+app.use('/auth/employee', employeeAuthRoutes);
+app.use('/customer/profile', customerProfileRoutes);
+app.use('/employee/profile', employeeProfileRoutes);
+app.use('/customer/sessions', customerSessionRoutes);
+app.use('/employee/sessions', employeeSessionRoutes);
+app.use('/cpanel', adminRoutes);
+app.use('/customer/addresses', customerAddressRoutes);
+app.use('/customer/notifications', customerNotificationRoutes);
+app.use('/employee/notifications', employeeNotificationRoutes);
+app.use('/employee/categories', employeeCategoryRoutes);
+app.use('/employee/products', employeeProductRoutes);
+app.use('/catalog/products', catalogProductRoutes);
+app.use('/employee/media', employeeMediaRoutes);
+app.use('/customer/wishlist', customerWishlistRoutes);
+app.use('/customer/cart', customerCartRoutes);
+app.use('/customer/orders', customerOrderRoutes);
+app.use('/employee/orders', employeeOrderRoutes);
+
+app.get('/csrf-token', (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
+
+// Error handler
+// eslint-disable-next-line no-unused-vars
+app.use((err, _req, res, _next) => {
+  const status = err.status || 500;
+  res.status(status).json({ message: err.message || 'Server error' });
+});
+app.use(csrfErrorHandler);
+
+mongoose
+  .connect(config.mongoUri)
+  .then(() => {
+    console.log('Connected to MongoDB');
+    app.listen(config.port, () => {
+      console.log(`Server running on port ${config.port}`);
+    });
+  })
+  .catch((err) => {
+    console.error('Failed to connect to MongoDB', err);
+    process.exit(1);
+  });
