@@ -1,1 +1,160 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@theme {
+  --font-sans: "Space Grotesk", "Sora", "Segoe UI", system-ui, -apple-system,
+    sans-serif;
+
+  /* 🎨 Primary System */
+  --color-primary: #029fae;
+  --color-primary-hover: #008490;
+
+  /* 🌗 Complementary Theme */
+  --color-light-bg: #f1f5f9;
+  --color-light-text: #0f172a;
+  --color-light-card: #ffffff;
+  --color-dark-bg: #0f172a;
+  --color-dark-card: #1e293b;
+  --color-dark-hover: #132337;
+  --color-text-light: #f8fafc;
+
+  /* 🧭 Header & Brand Colors */
+  --color-topBar: #272343;
+  --color-topBar-text: #ffffff;
+  --color-topBar-accent: #1ba294;
+
+  /* 🧱 Text System */
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #4b5563;
+
+  /* 🧩 Accent Surfaces */
+  --color-accent-bg: #f7f9fa;
+
+  /* ===== Shadows ===== */
+  --shadow-soft: 0 2px 6px rgba(0, 0, 0, 0.08);
+  --shadow-strong: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-accent: 0 4px 10px rgba(2, 159, 174, 0.25);
+  --shadow-lifted: 0 18px 50px -20px rgba(2, 159, 174, 0.45),
+    0 6px 14px -10px rgba(15, 23, 42, 0.35);
+
+  /* Aliases for tailwind utilities */
+  --color-background: var(--color-light-bg);
+  --color-surface: var(--color-light-card);
+  --color-surface-muted: #e2e8f0;
+  --color-ink: var(--color-light-text);
+  --color-muted: var(--color-text-secondary);
+  --color-border: #e5eaf3;
+  --color-brand: var(--color-primary);
+  --color-brand-strong: var(--color-primary-hover);
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+    background-color: var(--color-background);
+    font-family: var(--font-sans);
+  }
+
+  html {
+    @apply transition-colors duration-300;
+  }
+
+  body {
+    @apply bg-light-bg text-light-text dark:bg-dark-bg dark:text-text-light antialiased;
+    letter-spacing: -0.01em;
+    background-image:
+      radial-gradient(1100px 1100px at 12% 8%, rgba(2, 159, 174, 0.12), transparent),
+      radial-gradient(900px 900px at 88% 4%, rgba(39, 35, 67, 0.08), transparent),
+      linear-gradient(180deg, #f9fbff 0%, #f3f5fa 35%, #f7f9fc 100%);
+  }
+
+  body:where([data-theme=dark], [data-theme=dark] *) {
+    background-image:
+      radial-gradient(900px 900px at 18% 10%, rgba(2, 159, 174, 0.2), transparent),
+      radial-gradient(800px 800px at 90% 0%, rgba(39, 35, 67, 0.25), transparent),
+      linear-gradient(180deg, #0f172a 0%, #0b1223 50%, #0f172a 100%);
+  }
+
+  ::selection {
+    background-color: rgba(2, 159, 174, 0.18);
+    color: var(--color-ink);
+  }
+
+  a {
+    color: var(--color-brand);
+    text-decoration: none;
+    transition: color 150ms ease;
+  }
+
+  a:hover {
+    color: var(--color-brand-strong);
+  }
+}
+
+@layer components {
+  .card-surface {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-soft);
+    border-radius: 1rem;
+  }
+
+  .card-surface:where([data-theme=dark], [data-theme=dark] *) {
+    background: var(--color-dark-card);
+    border-color: rgba(255, 255, 255, 0.04);
+    box-shadow: var(--shadow-strong);
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-surface-muted) 55%, #ffffff 45%);
+    color: var(--color-muted);
+    border: 1px solid var(--color-border);
+  }
+
+  .pill:where([data-theme=dark], [data-theme=dark] *) {
+    background: color-mix(in srgb, var(--color-dark-card) 70%, #1b2638 30%);
+    color: var(--color-text-light);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  /* Sidebar scroll styling */
+  .sidebar-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+  .sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .sidebar-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #b2e2e8 0%, #8dd4de 100%);
+    border-radius: 999px;
+    box-shadow: inset 0 0 0 2px #f7f9fc;
+  }
+  .sidebar-scroll:hover::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #6cc7d4 0%, #31b7c7 100%);
+    box-shadow: inset 0 0 0 1px #e7f5f9;
+  }
+}
+
+/* Print only the invoice card when print mode is toggled */
+.print-invoice-only * {
+  visibility: hidden !important;
+}
+
+.print-invoice-only .invoice-print-area,
+.print-invoice-only .invoice-print-area * {
+  visibility: visible !important;
+}
+
+.print-invoice-only .invoice-print-area {
+  position: absolute;
+  inset: 0;
+  margin: 0 auto;
+  background: white;
+}

@@ -1,3 +1,9 @@
-export default function Dashboard() {
-  return <div className="p-4">Cpanel Dashboard</div>;
+import React from 'react'
+
+const Dashboard = () => {
+  return (
+    <div>Dashboard</div>
+  )
 }
+
+export default Dashboard
