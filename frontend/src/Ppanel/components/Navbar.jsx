@@ -64,16 +64,17 @@ export default function Navbar() {
         <div className="w-full flex items-center justify-between gap-4 lg:gap-8 px-4 lg:px-20 py-4">
           <Link
             to="/"
-            className="flex items-center gap-3 text-2xl lg:text-3xl font-extrabold tracking-tight text-primary"
+            className="flex items-center gap-2 text-2xl lg:text-3xl font-extrabold tracking-tight text-primary"
+            aria-label="Unimall home"
           >
             <img
               src={logoSmall}
               alt="Unimall logo"
-              className="w-10 h-10 lg:w-12 lg:h-12 rounded-full object-cover shadow-sm"
+              className="w-11 h-11 lg:w-12 lg:h-12 object-contain"
             />
             <span className="flex items-baseline gap-1">
-              <span className="text-[#0056A3]">Uni</span>
-              <span className="text-primary">Mall</span>
+              <span className="text-[#0056A3] uppercase tracking-tight">UNI</span>
+              <span className="text-primary uppercase tracking-tight">MALL</span>
             </span>
           </Link>
 
