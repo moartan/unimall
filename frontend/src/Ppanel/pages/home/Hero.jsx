@@ -26,11 +26,8 @@ export default function Hero({ containerClass }) {
         <div className="rounded-3xl bg-gradient-to-br from-[#e8f3f7] via-[#e3f0f6] to-[#e9f4f8] p-6 lg:p-10 shadow-sm border border-slate-100">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             <div className="space-y-6">
-              <p className="text-xs lg:text-sm uppercase tracking-[0.24em] text-primary font-semibold">
-                Unimall Picks
-              </p>
               <h1 className="text-3xl lg:text-5xl font-black leading-tight text-slate-900">
-                Shop Smart, Shop Faster — Everything You Need in One Place.
+                Shop Smart, Shop Faster Everything You Need in One Place.
               </h1>
               <p className="text-lg lg:text-xl text-slate-600">
                 Discover the best deals on electronics, gadgets, accessories &

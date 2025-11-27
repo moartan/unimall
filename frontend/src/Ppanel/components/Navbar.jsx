@@ -9,12 +9,11 @@ import SearchBar from "./SearchBar";
 
 const primaryLinks = [
   { label: "Home", to: "/" },
-  { label: "All Products", to: "/products" },
+  { label: "Collections", to: "/products" },
+  { label: "Trending", to: "/products/trending" },
   { label: "Mobile", to: "/products/mobile" },
-  { label: "Watch", to: "/products/watch" },
   { label: "Camera", to: "/products/camera" },
   { label: "Laptop", to: "/products/laptop" },
-  { label: "Ipad", to: "/products/ipad" },
   { label: "About", to: "/about" },
   { label: "Contact us", to: "/contact" },
 ];
