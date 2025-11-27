@@ -5,6 +5,7 @@ import { usePpanel } from "../context/PpanelProvider";
 import { useCart } from "../context/useCart";
 import { useWishlist } from "../context/useWishlist";
 import logoSmall from "../../assets/logoSmall.png";
+import SearchBar from "./SearchBar";
 
 const primaryLinks = [
   { label: "Home", to: "/" },
@@ -31,11 +32,10 @@ export default function Navbar() {
   const wishlistItems = wishlist.items ?? [];
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
   const profileRef = useRef(null);
-  const searchRef = useRef(null);
   const cartRef = useRef(null);
+  const openMobileSearchRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -77,22 +77,23 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* Search */}
-          <div className="hidden lg:flex flex-1 max-w-4xl" ref={searchRef}>
-            <div className="h-14 rounded-full border-2 border-primary/50 bg-white flex items-center px-6 text-primary gap-3 w-full shadow-sm">
-              <Search size={18} />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search products..."
-                className="flex-1 outline-none text-slate-700 text-base lg:text-lg"
-              />
-            </div>
-          </div>
+          <SearchBar
+            hideDefaultMobileTrigger
+            registerMobileOpen={(fn) => {
+              openMobileSearchRef.current = fn;
+            }}
+          />
 
           {/* Actions */}
-          <div className="flex items-center gap-3 lg:gap-4 text-primary">
+          <div className="flex items-center gap-2.5 lg:gap-4 text-primary">
+            <button
+              className="lg:hidden flex items-center justify-center p-2 text-primary hover:text-primary/80 transition"
+              onClick={() => openMobileSearchRef.current && openMobileSearchRef.current()}
+              aria-label="Open search"
+            >
+              <Search size={20} />
+            </button>
+
             <IconPill
               to="/wishlist"
               icon={<Heart size={20} />}
@@ -353,20 +354,12 @@ export default function Navbar() {
                 )}
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <Link
-                  to="/login"
-                  className="px-4 py-2 rounded-full border border-primary text-primary hover:bg-primary hover:text-white transition text-sm font-semibold"
-                >
-                  Login
-                </Link>
-                <Link
-                  to="/register"
-                  className="px-4 py-2 rounded-full bg-primary text-white hover:bg-primary-hover transition text-sm font-semibold"
-                >
-                  Sign Up
-                </Link>
-              </div>
+              <Link
+                to="/login"
+                className="px-4 py-2 rounded-full border border-primary text-primary hover:bg-primary hover:text-white transition text-sm font-semibold"
+              >
+                Login
+              </Link>
             )}
           </div>
         </div>
