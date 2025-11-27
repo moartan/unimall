@@ -114,7 +114,7 @@ export default function Products() {
   const [activeTag, setActiveTag] = useState("All");
   const [view, setView] = useState("grid");
   const [sort, setSort] = useState("Featured");
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
@@ -128,109 +128,107 @@ export default function Products() {
   return (
     <div className="w-full mx-auto px-4 lg:px-20 py-8 bg-[#f8fafc]">
       <div className="flex flex-col lg:flex-row gap-6">
-        <div className="lg:hidden">
-          <button
-            onClick={() => setFiltersOpen((v) => !v)}
-            className="w-full bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-3 flex items-center justify-between text-slate-700 font-semibold"
-          >
-            <span className="inline-flex items-center gap-2">
-              <Filter size={18} /> Filters
-            </span>
-            <ChevronDown
-              size={16}
-              className={`transition ${filtersOpen ? "rotate-180" : ""}`}
-            />
-          </button>
-        </div>
-
         {/* Filters */}
-        <aside
-          className={`lg:w-72 flex-shrink-0 ${filtersOpen ? "block" : "hidden lg:block"}`}
-        >
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 space-y-6 mt-2 lg:mt-0">
-            <div className="flex items-center justify-between">
+        <aside className="lg:w-72 flex-shrink-0">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 space-y-4 mt-2 lg:mt-0">
+            <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-slate-800 font-bold text-lg">
-                <SlidersHorizontal size={18} /> Filters
+                <Filter size={18} /> Filters
               </div>
-              <button className="text-primary text-sm font-semibold">Reset</button>
+              <div className="flex items-center gap-2">
+                <button className="text-primary text-sm font-semibold">Reset</button>
+                <button
+                  onClick={() => setFiltersOpen((v) => !v)}
+                  className="w-8 h-8 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:text-primary"
+                >
+                  <ChevronDown
+                    size={16}
+                    className={`transition ${filtersOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+              </div>
             </div>
 
-            <FilterBlock title="Categories">
-              <div className="space-y-2">
-                {categories.map((cat) => (
-                  <button
-                    key={cat.value}
-                    onClick={() => setActiveCategory(cat.value)}
-                    className={`w-full text-left p-3 rounded-2xl border text-sm transition ${
-                      activeCategory === cat.value
-                        ? "border-primary text-primary bg-primary/5"
-                        : "border-slate-200 text-slate-700 hover:border-primary/40"
-                    }`}
-                  >
-                    <p className="font-semibold">{cat.label}</p>
-                    <p className="text-xs text-slate-500">{cat.desc}</p>
-                  </button>
-                ))}
-              </div>
-            </FilterBlock>
+            {filtersOpen && (
+              <>
+                <FilterBlock title="Categories">
+                  <div className="space-y-2">
+                    {categories.map((cat) => (
+                      <button
+                        key={cat.value}
+                        onClick={() => setActiveCategory(cat.value)}
+                        className={`w-full text-left p-3 rounded-2xl border text-sm transition ${
+                          activeCategory === cat.value
+                            ? "border-primary text-primary bg-primary/5"
+                            : "border-slate-200 text-slate-700 hover:border-primary/40"
+                        }`}
+                      >
+                        <p className="font-semibold">{cat.label}</p>
+                        <p className="text-xs text-slate-500">{cat.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </FilterBlock>
 
-            <FilterBlock title="Price range">
-              <div className="space-y-2">
-                {priceRanges.map((p) => (
-                  <label
-                    key={p.value}
-                    className={`flex items-center justify-between gap-2 p-3 rounded-2xl border text-sm cursor-pointer transition ${
-                      activePrice === p.value
-                        ? "border-primary text-primary bg-primary/5"
-                        : "border-slate-200 text-slate-700 hover:border-primary/40"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="radio"
-                        name="price"
-                        checked={activePrice === p.value}
-                        onChange={() => setActivePrice(p.value)}
-                        className="accent-primary"
-                      />
-                      <span>{p.label}</span>
-                    </div>
-                    <CircleDot
-                      size={16}
-                      className={activePrice === p.value ? "text-primary" : "text-slate-300"}
-                    />
-                  </label>
-                ))}
-              </div>
-            </FilterBlock>
+                <FilterBlock title="Price range">
+                  <div className="space-y-2">
+                    {priceRanges.map((p) => (
+                      <label
+                        key={p.value}
+                        className={`flex items-center justify-between gap-2 p-3 rounded-2xl border text-sm cursor-pointer transition ${
+                          activePrice === p.value
+                            ? "border-primary text-primary bg-primary/5"
+                            : "border-slate-200 text-slate-700 hover:border-primary/40"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="radio"
+                            name="price"
+                            checked={activePrice === p.value}
+                            onChange={() => setActivePrice(p.value)}
+                            className="accent-primary"
+                          />
+                          <span>{p.label}</span>
+                        </div>
+                        <CircleDot
+                          size={16}
+                          className={activePrice === p.value ? "text-primary" : "text-slate-300"}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </FilterBlock>
 
-            <FilterBlock title="Customer Rating">
-              <div className="space-y-2">
-                {ratings.map((r) => (
-                  <label
-                    key={r.value}
-                    className={`flex items-center gap-3 p-3 rounded-2xl border text-sm cursor-pointer transition ${
-                      activeRating === r.value
-                        ? "border-primary text-primary bg-primary/5"
-                        : "border-slate-200 text-slate-700 hover:border-primary/40"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="rating"
-                      checked={activeRating === r.value}
-                      onChange={() => setActiveRating(r.value)}
-                      className="accent-primary"
-                    />
-                    <span>{r.label}</span>
-                  </label>
-                ))}
-              </div>
-            </FilterBlock>
-            <hr className="my-4" />
-            <button className="w-full h-12 rounded-full bg-primary text-white font-semibold text-base shadow-sm hover:bg-primary-hover transition">
-              Apply filters
-            </button>
+                <FilterBlock title="Customer Rating">
+                  <div className="space-y-2">
+                    {ratings.map((r) => (
+                      <label
+                        key={r.value}
+                        className={`flex items-center gap-3 p-3 rounded-2xl border text-sm cursor-pointer transition ${
+                          activeRating === r.value
+                            ? "border-primary text-primary bg-primary/5"
+                            : "border-slate-200 text-slate-700 hover:border-primary/40"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="rating"
+                          checked={activeRating === r.value}
+                          onChange={() => setActiveRating(r.value)}
+                          className="accent-primary"
+                        />
+                        <span>{r.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </FilterBlock>
+                <hr className="my-4" />
+                <button className="w-full h-12 rounded-full bg-primary text-white font-semibold text-base shadow-sm hover:bg-primary-hover transition">
+                  Apply filters
+                </button>
+              </>
+            )}
           </div>
         </aside>
 
