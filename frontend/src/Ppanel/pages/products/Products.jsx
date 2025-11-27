@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   List as ListIcon,
   ChevronDown,
+  Filter,
 } from "lucide-react";
 
 const categories = [
@@ -113,6 +114,7 @@ export default function Products() {
   const [activeTag, setActiveTag] = useState("All");
   const [view, setView] = useState("grid");
   const [sort, setSort] = useState("Featured");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
@@ -126,9 +128,26 @@ export default function Products() {
   return (
     <div className="w-full mx-auto px-4 lg:px-20 py-8 bg-[#f8fafc]">
       <div className="flex flex-col lg:flex-row gap-6">
+        <div className="lg:hidden">
+          <button
+            onClick={() => setFiltersOpen((v) => !v)}
+            className="w-full bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-3 flex items-center justify-between text-slate-700 font-semibold"
+          >
+            <span className="inline-flex items-center gap-2">
+              <Filter size={18} /> Filters
+            </span>
+            <ChevronDown
+              size={16}
+              className={`transition ${filtersOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+        </div>
+
         {/* Filters */}
-        <aside className="lg:w-72 flex-shrink-0">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 space-y-6">
+        <aside
+          className={`lg:w-72 flex-shrink-0 ${filtersOpen ? "block" : "hidden lg:block"}`}
+        >
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 space-y-6 mt-2 lg:mt-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-slate-800 font-bold text-lg">
                 <SlidersHorizontal size={18} /> Filters
