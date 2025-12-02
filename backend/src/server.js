@@ -33,7 +33,7 @@ app.use(helmet());
 // --- CORS CONFIG: allow Vercel + local dev ---
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://your-frontend-name.vercel.app"
+  "https://unimall-wine.vercel.app/"
 ];
 
 app.use(cors({

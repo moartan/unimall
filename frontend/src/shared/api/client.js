@@ -2,7 +2,6 @@ import axios from 'axios';
 
 const resolveBaseUrl = () => {
   if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL;
-  if (typeof __VITE_API_BASE_URL__ !== 'undefined') return __VITE_API_BASE_URL__;
   if (typeof window !== 'undefined') {
     const host = window.location.hostname || '';
     if (host && host !== 'localhost' && host !== '127.0.0.1') {
@@ -10,6 +9,7 @@ const resolveBaseUrl = () => {
       return 'https://unimall-2lgl.onrender.com';
     }
   }
+  if (typeof __VITE_API_BASE_URL__ !== 'undefined') return __VITE_API_BASE_URL__;
   return 'http://localhost:8081';
 };
 
