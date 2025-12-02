@@ -221,7 +221,7 @@ export default function Products() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center overflow-hidden rounded-full border border-slate-200">
+                    <div className="hidden lg:flex items-center overflow-hidden rounded-full border border-slate-200">
                       <button
                         onClick={() => setView("grid")}
                         className={`px-4 py-2 text-sm font-semibold inline-flex items-center gap-2 ${
