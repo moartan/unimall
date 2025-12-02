@@ -27,32 +27,47 @@ import employeeOrderRoutes from './routes/employee/orderRoutes.js';
 
 const app = express();
 
+// --- Security ---
 app.use(helmet());
-const corsConfig = {
-  origin: true, // reflect request origin (development-friendly)
+
+// --- CORS CONFIG: allow Vercel + local dev ---
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://your-frontend-name.vercel.app"
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow requests with no origin (mobile apps, curl)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error("Not allowed by CORS"));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 200,
-};
+}));
 
-app.use(cors(corsConfig));
 app.use(express.json());
 app.use(cookieParser());
 app.use(csrfSkip);
 
+// Rate limiter
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
 });
 app.use('/auth', authLimiter);
 
-// Health check endpoint
+// Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Auth routes
+// Routes
 app.use('/auth/customer', customerAuthRoutes);
 app.use('/auth/employee', employeeAuthRoutes);
 app.use('/customer/profile', customerProfileRoutes);
@@ -77,19 +92,22 @@ app.get('/csrf-token', (req, res) => {
 });
 
 // Error handler
-// eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
   const status = err.status || 500;
   res.status(status).json({ message: err.message || 'Server error' });
 });
+
 app.use(csrfErrorHandler);
+
+// --- Render requires PORT from environment ---
+const PORT = process.env.PORT || 5000;
 
 mongoose
   .connect(config.mongoUri)
   .then(() => {
     console.log('Connected to MongoDB');
-    app.listen(config.port, () => {
-      console.log(`Server running on port ${config.port}`);
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
     });
   })
   .catch((err) => {
