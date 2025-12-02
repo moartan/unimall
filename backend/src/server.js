@@ -33,23 +33,23 @@ app.use(helmet());
 // --- CORS CONFIG: allow Vercel + local dev ---
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://unimall-wine.vercel.app"
-];
+  "http://localhost:3000",
+  "http://localhost:8080",
+  "https://unimall-wine.vercel.app",
+  process.env.CORS_ORIGIN,
+].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
-    // allow requests with no origin (mobile apps, curl)
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
+    if (!origin) return callback(null, true); // allow curl/postman
+    if (allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+app.options('*', cors());
 
 app.use(express.json());
 app.use(cookieParser());
