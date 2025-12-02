@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
-import { Heart, ShoppingCart, User, Search } from "lucide-react";
+import { Heart, ShoppingCart, User, Search, Bell, Clock } from "lucide-react";
+import dayjs from "dayjs";
 import { usePpanel } from "../context/PpanelProvider";
-import { useCart } from "../context/useCart";
+import { useCart } from "../context/useCart.jsx";
 import { useWishlist } from "../context/useWishlist";
 import logoSmall from "../../assets/logoSmall.png";
 import SearchBar from "./SearchBar";
+import CartCard from "../pages/cart/CartCard";
 
 const primaryLinks = [
   { label: "Home", to: "/" },
@@ -19,7 +21,7 @@ const primaryLinks = [
 ];
 
 export default function Navbar() {
-  const { user, logout } = usePpanel();
+  const { user, logout, api } = usePpanel();
   const cart = useCart() || {};
   const wishlist = useWishlist() || {};
 
@@ -35,6 +37,11 @@ export default function Navbar() {
   const profileRef = useRef(null);
   const cartRef = useRef(null);
   const openMobileSearchRef = useRef(null);
+  const notifRef = useRef(null);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifError, setNotifError] = useState("");
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -43,6 +50,9 @@ export default function Navbar() {
       }
       if (cartRef.current && !cartRef.current.contains(e.target)) {
         setCartOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setNotifOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -54,6 +64,45 @@ export default function Navbar() {
     const value = Number(price);
     if (Number.isNaN(value)) return null;
     return `$${value.toLocaleString()}`;
+  };
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  const displayName = user?.name || user?.fullName || user?.email || "";
+  const email = user?.email || "";
+  const initials = (displayName || email || "U")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  const fetchNotifications = async () => {
+    setNotifLoading(true);
+    setNotifError("");
+    try {
+      const { data } = await api.get("/customer/notifications");
+      setNotifications(data?.notifications || []);
+    } catch (err) {
+      setNotifError(err?.response?.data?.message || "Failed to load notifications.");
+    } finally {
+      setNotifLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (notifOpen) {
+      fetchNotifications();
+    }
+  }, [notifOpen]);
+
+  const markAllRead = async () => {
+    try {
+      await api.post("/customer/notifications/read-all");
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    } catch (_err) {
+      // ignore mark all failure
+    }
   };
 
   return (
@@ -136,84 +185,17 @@ export default function Navbar() {
                   </div>
 
                   {cartItems.length ? (
-                    <div className="max-h-[50vh] overflow-y-auto divide-y divide-slate-100">
-                      {cartItems.map((item) => {
-                        const detailLink = item.slug
-                          ? `/products/details/${item.slug}`
-                          : "/products";
-                        const disableIncrement =
-                          item.stock > 0 && item.quantity >= item.stock;
-                        return (
-                          <div
-                            key={item.productId}
-                            className="flex gap-3 px-4 py-3"
-                          >
-                            <Link
-                              to={detailLink}
-                              className="w-14 h-14 rounded-xl border border-slate-200 flex-shrink-0 overflow-hidden bg-slate-50"
-                              onClick={() => setCartOpen(false)}
-                            >
-                              {item.image ? (
-                                <img
-                                  src={item.image}
-                                  alt={item.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <span className="text-xs text-slate-400 flex items-center justify-center h-full">
-                                  Preview
-                                </span>
-                              )}
-                            </Link>
-                            <div className="flex-1 min-w-0">
-                              <Link
-                                to={detailLink}
-                                className="text-sm font-semibold text-slate-900 line-clamp-2 hover:text-primary"
-                                onClick={() => setCartOpen(false)}
-                              >
-                                {item.name}
-                              </Link>
-                              <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 mt-1">
-                                <span>{formatPrice(item.price)}</span>
-                                {item.originalPrice > item.price && (
-                                  <span className="text-xs text-slate-400 line-through">
-                                    {formatPrice(item.originalPrice)}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2 mt-2">
-                                <button
-                                  className="w-7 h-7 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:border-primary/40 disabled:opacity-40"
-                                  onClick={() =>
-                                    setQuantity(item, item.quantity - 1)
-                                  }
-                                  disabled={item.quantity <= 1}
-                                >
-                                  −
-                                </button>
-                                <span className="text-sm font-semibold text-slate-900">
-                                  {item.quantity}
-                                </span>
-                                <button
-                                  className="w-7 h-7 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:border-primary/40 disabled:opacity-40"
-                                  onClick={() =>
-                                    setQuantity(item, item.quantity + 1)
-                                  }
-                                  disabled={disableIncrement}
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => removeItem(item.productId)}
-                              className="text-xs text-rose-500 hover:text-rose-600"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        );
-                      })}
+                    <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                      {cartItems.map((item) => (
+                        <div key={item.id} className="px-4">
+                          <CartCard
+                            item={item}
+                            onIncrease={() => setQuantity(item, item.quantity + 1)}
+                            onDecrease={() => setQuantity(item, item.quantity - 1)}
+                            onRemove={() => removeItem(item.id)}
+                          />
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <div className="px-4 py-10 text-center text-sm text-slate-500">
@@ -245,113 +227,170 @@ export default function Navbar() {
             </div>
 
             {user ? (
-              <div className="relative" ref={profileRef}>
-                <button
-                  onClick={() => setMenuOpen(!menuOpen)}
-                  className="flex items-center gap-2 rounded-full bg-primary/10 text-primary font-semibold px-3 lg:px-4 py-1.5 hover:bg-primary/20 transition"
-                >
-                  {user.avatar ? (
-                    <img
-                      src={user.avatar}
-                      alt={user.fullName}
-                      className="w-8 h-8 rounded-full object-cover border border-primary/30"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center">
-                      {user.fullName?.slice(0, 2).toUpperCase() || (
-                        <User size={18} />
-                      )}
-                    </div>
-                  )}
-                  <span className="hidden sm:inline text-sm">
-                    {user.fullName?.split(" ")[0]}
-                  </span>
-                </button>
-
-                {menuOpen && (
-                  <div className="absolute right-0 mt-3 w-56 rounded-xl bg-white shadow-xl border border-slate-200 overflow-hidden text-sm z-40">
-                    <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
-                      {user.avatar ? (
-                        <img
-                          src={user.avatar}
-                          alt={user.fullName}
-                          className="w-9 h-9 rounded-full object-cover border border-primary/20"
-                        />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center">
-                          {user.fullName?.slice(0, 2).toUpperCase() || (
-                            <User size={16} />
-                          )}
-                        </div>
-                      )}
-
-                      <div>
-                        <p className="font-semibold text-slate-900">
-                          {user.fullName}
-                        </p>
-                        <p className="text-xs text-slate-500">{user.email}</p>
+              <div className="flex items-center gap-3">
+                <div className="relative" ref={notifRef}>
+                  <button
+                    className="p-2 rounded-full text-primary hover:bg-primary/10 transition relative"
+                    aria-label="Notifications"
+                    onClick={() => {
+                      setNotifOpen((p) => !p);
+                      setMenuOpen(false);
+                    }}
+                  >
+                    <Bell size={20} />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </button>
+                  {notifOpen && (
+                    <div className="absolute right-0 mt-3 w-72 rounded-2xl bg-white shadow-xl border border-slate-200 overflow-hidden text-sm z-40">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 font-semibold text-slate-800">
+                        <span>Notifications</span>
+                        <button
+                          onClick={markAllRead}
+                          className="text-[11px] text-primary font-semibold hover:underline"
+                        >
+                          Mark all read
+                        </button>
+                      </div>
+                      <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+                        {notifLoading ? (
+                          <div className="px-4 py-3 text-slate-500">Loading...</div>
+                        ) : notifError ? (
+                          <div className="px-4 py-3 text-red-600">{notifError}</div>
+                        ) : notifications.length === 0 ? (
+                          <div className="px-4 py-3 text-slate-500">No notifications.</div>
+                        ) : (
+                          notifications.map((n) => (
+                            <div key={n._id} className="px-4 py-3 flex gap-3">
+                              <div className={`${n.read ? "text-slate-400" : "text-primary"} mt-0.5`}>
+                                <Bell size={16} />
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-semibold text-slate-800">{n.title || "Notification"}</p>
+                                <p className="text-xs text-slate-500">{n.body || ""}</p>
+                                <p className="text-[11px] text-slate-400 flex items-center gap-1">
+                                  <Clock size={12} />{" "}
+                                  {n.createdAt ? dayjs(n.createdAt).format("MMM D, YYYY h:mm A") : ""}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </div>
+                  )}
+                </div>
 
-                    {user && !user.isEmailVerified && (
-                      <Link
-                        to="/profile/email-verification"
-                        className="px-4 py-2 border-b border-slate-100 text-red-500 font-semibold flex items-center justify-between gap-2 hover:bg-red-50"
-                        onClick={() => setMenuOpen(false)}
-                      >
-                        <span className="flex items-center gap-2">
-                          <span>⚠️</span> Please Verify
-                        </span>
-                      </Link>
+                <div className="relative" ref={profileRef}>
+                  <button
+                    onClick={() => {
+                      setMenuOpen(!menuOpen);
+                      setNotifOpen(false);
+                    }}
+                    className="flex items-center gap-3 rounded-full bg-primary/10 text-slate-900 px-3 lg:px-4 py-1.5 hover:bg-primary/20 transition"
+                  >
+                    {user.avatar ? (
+                      <img
+                        src={user.avatar}
+                        alt={displayName}
+                        className="w-8 h-8 rounded-full object-cover border border-primary/30"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center">
+                        {initials || <User size={18} />}
+                      </div>
                     )}
+                    <span className="hidden sm:inline text-sm font-bold text-slate-900">
+                      {displayName}
+                    </span>
+                  </button>
 
-                    <ul className="py-2 text-slate-700">
-                      <li>
-                        <Link
-                          to="/profile"
-                          className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          <User size={16} /> Profile
-                        </Link>
-                      </li>
-                      <li>
-                        <Link
-                          to="/orders"
-                          className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          📦 My Orders
-                        </Link>
-                      </li>
-                      <li>
-                        <Link
-                          to="/addresses"
-                          className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          📍 Addresses
-                        </Link>
-                      </li>
-                      <li>
-                        <Link
-                          to="/payments"
-                          className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          💳 Payments
-                        </Link>
-                      </li>
-                    </ul>
+                  {menuOpen && (
+                    <div className="absolute right-0 mt-3 w-64 rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden text-sm z-40">
+                      <div className="flex items-center gap-2 px-4 py-4 border-b border-slate-100">
+                        {user.avatar ? (
+                          <img
+                            src={user.avatar}
+                            alt={displayName}
+                            className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full object-cover border border-primary/20 flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full bg-primary text-white flex items-center justify-center text-sm flex-shrink-0">
+                            {initials || <User size={16} />}
+                          </div>
+                        )}
 
-                    <button
-                      onClick={logout}
-                      className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 w-full font-semibold mt-1 border-t border-slate-100"
-                    >
-                      ⎋ Logout
-                    </button>
-                  </div>
-                )}
+                        <div className="flex flex-col leading-tight">
+                          <p className="text-lg font-semibold text-slate-900">
+                            {displayName}
+                          </p>
+                          <p className="text-sm text-slate-600">{email}</p>
+                        </div>
+                      </div>
+
+                      {user && user.emailVerified === false && (
+                        <Link
+                          to="/profile/email-verification"
+                          className="px-4 py-2 border-b border-slate-100 text-red-500 font-semibold flex items-center justify-between gap-2 hover:bg-red-50"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <span className="flex items-center gap-2">
+                            <span>⚠️</span> Please Verify
+                          </span>
+                        </Link>
+                      )}
+
+                      <ul className="py-2 text-slate-700">
+                        <li>
+                          <Link
+                            to="/profile?tab=overview"
+                            className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50"
+                            onClick={() => setMenuOpen(false)}
+                          >
+                            <User size={16} /> Profile
+                          </Link>
+                        </li>
+                        <li>
+                          <Link
+                            to="/orders"
+                            className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50"
+                            onClick={() => setMenuOpen(false)}
+                          >
+                            📦 My Orders
+                          </Link>
+                        </li>
+                        <li>
+                          <Link
+                            to="/profile?tab=addresses"
+                            className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50"
+                            onClick={() => setMenuOpen(false)}
+                          >
+                            📍 Addresses
+                          </Link>
+                        </li>
+                        <li>
+                          <Link
+                            to="/profile?tab=security"
+                            className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50"
+                            onClick={() => setMenuOpen(false)}
+                          >
+                            🔒 Security
+                          </Link>
+                        </li>
+                      </ul>
+
+                      <button
+                        onClick={logout}
+                        className="flex items-center gap-2 px-4 py-3 text-red-600 hover:bg-red-50 w-full font-semibold"
+                      >
+                        ⎋ Logout
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <Link

@@ -1,3 +1,5 @@
+import { Navigate } from 'react-router-dom';
+
 export default function Categories() {
-  return <div className="p-4">Cpanel Categories</div>;
+  return <Navigate to="/cpanel/categories/list" replace />;
 }

@@ -8,21 +8,28 @@ import {
 } from '../../utils/tokens.js';
 import Session from '../../models/auth/Session.js';
 import AuditLog from '../../models/auth/AuditLog.js';
-import config from '../../config/env.js';
 import Notification from '../../models/common/Notification.js';
+import config from '../../config/env.js';
 
-export const setRefreshCookie = (res, token) => {
-  res.cookie(config.cookies.refreshName, token, {
+const cookiePathByName = (cookieName) => {
+  if (cookieName === config.cookies.employeeRefreshName) return '/auth/employee';
+  return '/auth/customer';
+};
+
+export const setRefreshCookie = (res, token, cookieName) => {
+  const name = cookieName || config.cookies.customerRefreshName;
+  res.cookie(name, token, {
     httpOnly: true,
     secure: config.cookies.secure,
     sameSite: config.cookies.sameSite,
     maxAge: config.jwt.refreshExpiresInMs,
-    path: '/auth',
+    path: cookiePathByName(name),
   });
 };
 
-export const clearRefreshCookie = (res) => {
-  res.clearCookie(config.cookies.refreshName, { path: '/auth' });
+export const clearRefreshCookie = (res, cookieName) => {
+  const name = cookieName || config.cookies.customerRefreshName;
+  res.clearCookie(name, { path: cookiePathByName(name) });
 };
 
 export const createSession = async (userId, refreshToken, { userAgent, ip, metadata } = {}) => {

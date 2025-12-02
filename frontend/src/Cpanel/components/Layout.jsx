@@ -1,10 +1,11 @@
 import { useContext } from 'react';
+import { Outlet } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
 import Sidebar from './Sidebar';
 import { CpanelContext } from '../context/CpanelProvider';
 
-export default function Layout({ children }) {
+export default function Layout() {
   const { sidebar, handleSidebar } = useContext(CpanelContext);
 
   return (
@@ -18,8 +19,10 @@ export default function Layout({ children }) {
       >
         <Header onMenuClick={handleSidebar} />
 
-        <main className="flex-1 bg-accent-bg/60 px-4 py-6 dark:bg-dark-bg/80 md:px-6 lg:px-6">
-          <div className="card-surface dark:bg-dark-card p-5 shadow-soft">{children}</div>
+        <main className="flex-1 bg-accent-bg/60 px-2 py-6 dark:bg-dark-bg/80 md:px-6 lg:px-8">
+          <div className="card-surface dark:bg-dark-card p-5 shadow-soft">
+            <Outlet />
+          </div>
         </main>
 
         <Footer />

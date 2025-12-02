@@ -1,16 +1,8 @@
-import { useMemo, useState } from "react";
-import {
-  SlidersHorizontal,
-  CircleDot,
-  Star,
-  Heart,
-  ShoppingCart,
-  Eye,
-  LayoutGrid,
-  List as ListIcon,
-  ChevronDown,
-  Filter,
-} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { LayoutGrid, List as ListIcon, ChevronDown } from "lucide-react";
+import ProductFilter from "./components/ProductFilter";
+import ProductList from "./components/ProductList";
+import QuickViewModal from "./components/QuickViewModal";
 
 const categories = [
   { label: "All categories", value: "all", desc: "Show everything that is published" },
@@ -45,8 +37,10 @@ const products = [
     originalPrice: 1799,
     badge: "Featured",
     rating: 0,
-    image:
-      "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=800&q=80",
+    shortDesc: "Compact APS-C camera with 4K120 recording and AI autofocus.",
+    warranty: "Includes 2-year warranty",
+    tags: ["sony a6700", "creator kit", "4k120"],
+    image: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=800&q=80",
   },
   {
     id: 2,
@@ -56,8 +50,10 @@ const products = [
     price: 2299,
     badge: "Featured",
     rating: 0,
-    image:
-      "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=800&q=80",
+    shortDesc: "Lightweight mixed-reality headset for immersive computing.",
+    warranty: "Includes 2-year warranty",
+    tags: ["vision pro", "ar headset", "apple xr"],
+    image: "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=800&q=80",
   },
   {
     id: 3,
@@ -68,8 +64,10 @@ const products = [
     originalPrice: 1999,
     badge: "Featured",
     rating: 0,
-    image:
-      "https://images.unsplash.com/photo-1519183071298-a2962be90b8e?auto=format&fit=crop&w=800&q=80",
+    shortDesc: "High-performance mirrorless camera with 8K video capture.",
+    warranty: "Includes 2-year warranty",
+    tags: ["canon r8", "mirrorless camera", "8k"],
+    image: "https://images.unsplash.com/photo-1519183071298-a2962be90b8e?auto=format&fit=crop&w=800&q=80",
   },
   {
     id: 4,
@@ -80,8 +78,10 @@ const products = [
     originalPrice: 2299,
     badge: "New",
     rating: 0,
-    image:
-      "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=800&q=80",
+    shortDesc: "Ultra-premium laptop with next-gen Intel Core processors.",
+    warranty: "Includes 2-year warranty",
+    tags: ["xps 16", "creator laptop"],
+    image: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=800&q=80",
   },
   {
     id: 5,
@@ -91,8 +91,10 @@ const products = [
     price: 1299,
     badge: "New",
     rating: 0,
-    image:
-      "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80",
+    shortDesc: "AI-powered flagship with upgraded Tensor G4 chip.",
+    warranty: "Includes 2-year warranty",
+    tags: ["pixel 9", "android"],
+    image: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80",
   },
   {
     id: 6,
@@ -102,8 +104,10 @@ const products = [
     price: 1099,
     badge: "Featured",
     rating: 0,
-    image:
-      "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80",
+    shortDesc: "Lightweight tablet with Apple Pencil Pro support.",
+    warranty: "Includes 2-year warranty",
+    tags: ["ipad air", "tablet", "apple pencil"],
+    image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80",
   },
 ];
 
@@ -115,276 +119,178 @@ export default function Products() {
   const [view, setView] = useState("grid");
   const [sort, setSort] = useState("Featured");
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const [quickProduct, setQuickProduct] = useState(null);
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
       const catOk = activeCategory === "all" || p.category === activeCategory;
-      const priceOk = true; // placeholder for now
+      const priceOk = true; // placeholder
       const ratingOk = activeRating ? p.rating >= activeRating : true;
       return catOk && priceOk && ratingOk;
     });
   }, [activeCategory, activePrice, activeRating]);
 
+  const selectedChips = useMemo(() => {
+    const chips = [];
+    if (activeCategory !== "all") {
+      const label = categories.find((c) => c.value === activeCategory)?.label || activeCategory;
+      chips.push({ label, type: "category", value: "all" });
+    }
+    if (activePrice !== "any") {
+      const label = priceRanges.find((p) => p.value === activePrice)?.label || activePrice;
+      chips.push({ label, type: "price", value: "any" });
+    }
+    return chips;
+  }, [activeCategory, activePrice]);
+
+  const related = useMemo(() => {
+    if (!quickProduct) return [];
+    return products.filter((p) => p.id !== quickProduct.id).slice(0, 3);
+  }, [quickProduct]);
+
+  const clearChip = (chip) => {
+    if (chip.type === "category") setActiveCategory("all");
+    if (chip.type === "price") setActivePrice("any");
+  };
+
+  const resetFilters = () => {
+    setActiveCategory("all");
+    setActivePrice("any");
+    setActiveRating(null);
+    setActiveTag("All");
+  };
+
+  // Collapse filters on mobile by default, expand on desktop
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const isMobile = window.innerWidth < 768;
+    setFiltersOpen(!isMobile);
+
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setFiltersOpen((prev) => {
+        if (mobile) return false;
+        return true;
+      });
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   return (
-    <div className="w-full mx-auto px-4 lg:px-20 py-8 bg-[#f8fafc]">
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Filters */}
-        <aside className="lg:w-72 flex-shrink-0">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 space-y-4 mt-2 lg:mt-0">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-slate-800 font-bold text-lg">
-                <Filter size={18} /> Filters
-              </div>
-              <div className="flex items-center gap-2">
-                <button className="text-primary text-sm font-semibold">Reset</button>
-                <button
-                  onClick={() => setFiltersOpen((v) => !v)}
-                  className="w-8 h-8 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:text-primary"
-                >
-                  <ChevronDown
-                    size={16}
-                    className={`transition ${filtersOpen ? "rotate-180" : ""}`}
-                  />
-                </button>
-              </div>
-            </div>
+    <>
+      <div className="w-full mx-auto px-4 lg:px-20 py-8 bg-[#f8fafc]">
+        <div className="flex flex-col lg:flex-row gap-6">
+          <ProductFilter
+            filtersOpen={filtersOpen}
+            onToggle={() => setFiltersOpen((v) => !v)}
+            onReset={resetFilters}
+            activeCategory={activeCategory}
+            setActiveCategory={setActiveCategory}
+            categories={categories}
+            activePrice={activePrice}
+            setActivePrice={setActivePrice}
+            priceRanges={priceRanges}
+            activeRating={activeRating}
+            setActiveRating={setActiveRating}
+            ratings={ratings}
+          />
 
-            {filtersOpen && (
-              <>
-                <FilterBlock title="Categories">
-                  <div className="space-y-2">
-                    {categories.map((cat) => (
+          <main className="flex-1">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5">
+              <div className="flex flex-col gap-4 mb-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm border-primary text-primary bg-primary/5">
+                      All
+                    </div>
+                    {selectedChips.map((chip) => (
+                      <div
+                        key={chip.label}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm border-slate-200 text-slate-700 bg-white"
+                      >
+                        <span>{chip.label}</span>
+                        <button
+                          onClick={() => clearChip(chip)}
+                          className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 hover:bg-primary/10 hover:text-primary transition"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center overflow-hidden rounded-full border border-slate-200">
                       <button
-                        key={cat.value}
-                        onClick={() => setActiveCategory(cat.value)}
-                        className={`w-full text-left p-3 rounded-2xl border text-sm transition ${
-                          activeCategory === cat.value
-                            ? "border-primary text-primary bg-primary/5"
-                            : "border-slate-200 text-slate-700 hover:border-primary/40"
+                        onClick={() => setView("grid")}
+                        className={`px-4 py-2 text-sm font-semibold inline-flex items-center gap-2 ${
+                          view === "grid"
+                            ? "bg-primary text-white"
+                            : "text-slate-600 hover:text-primary"
                         }`}
                       >
-                        <p className="font-semibold">{cat.label}</p>
-                        <p className="text-xs text-slate-500">{cat.desc}</p>
+                        <LayoutGrid size={16} /> Grid
                       </button>
-                    ))}
-                  </div>
-                </FilterBlock>
-
-                <FilterBlock title="Price range">
-                  <div className="space-y-2">
-                    {priceRanges.map((p) => (
-                      <label
-                        key={p.value}
-                        className={`flex items-center justify-between gap-2 p-3 rounded-2xl border text-sm cursor-pointer transition ${
-                          activePrice === p.value
-                            ? "border-primary text-primary bg-primary/5"
-                            : "border-slate-200 text-slate-700 hover:border-primary/40"
+                      <button
+                        onClick={() => setView("list")}
+                        className={`px-4 py-2 text-sm font-semibold inline-flex items-center gap-2 ${
+                          view === "list"
+                            ? "bg-primary text-white"
+                            : "text-slate-600 hover:text-primary"
                         }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="radio"
-                            name="price"
-                            checked={activePrice === p.value}
-                            onChange={() => setActivePrice(p.value)}
-                            className="accent-primary"
-                          />
-                          <span>{p.label}</span>
-                        </div>
-                        <CircleDot
-                          size={16}
-                          className={activePrice === p.value ? "text-primary" : "text-slate-300"}
-                        />
-                      </label>
-                    ))}
-                  </div>
-                </FilterBlock>
+                        <ListIcon size={16} /> List
+                      </button>
+                    </div>
 
-                <FilterBlock title="Customer Rating">
-                  <div className="space-y-2">
-                    {ratings.map((r) => (
-                      <label
-                        key={r.value}
-                        className={`flex items-center gap-3 p-3 rounded-2xl border text-sm cursor-pointer transition ${
-                          activeRating === r.value
-                            ? "border-primary text-primary bg-primary/5"
-                            : "border-slate-200 text-slate-700 hover:border-primary/40"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="rating"
-                          checked={activeRating === r.value}
-                          onChange={() => setActiveRating(r.value)}
-                          className="accent-primary"
-                        />
-                        <span>{r.label}</span>
-                      </label>
-                    ))}
+                    <button className="h-10 px-4 rounded-full border border-slate-200 text-sm font-semibold text-slate-700 inline-flex items-center gap-2">
+                      Sort by <span className="text-slate-900">{sort}</span>
+                      <ChevronDown size={16} />
+                    </button>
                   </div>
-                </FilterBlock>
-                <hr className="my-4" />
-                <button className="w-full h-12 rounded-full bg-primary text-white font-semibold text-base shadow-sm hover:bg-primary-hover transition">
-                  Apply filters
-                </button>
-              </>
-            )}
-          </div>
-        </aside>
+                </div>
 
-        {/* Products */}
-        <main className="flex-1">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5">
-            <div className="flex flex-col gap-4 mb-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  {["All", "Bestsellers", "Latest", "Bundles"].map((tag) => (
+                <div className="text-sm text-slate-600">
+                  Showing <span className="font-semibold">{filtered.length}</span> products
+                </div>
+              </div>
+
+              <ProductList products={filtered} onQuickView={(p) => setQuickProduct(p)} view={view} />
+
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-8 pt-4 border-t border-slate-100">
+                <div className="text-sm text-slate-600">Page 1 of 3</div>
+                <div className="flex items-center gap-2">
+                  <button className="px-4 h-10 rounded-full border border-slate-200 text-slate-500 bg-white">
+                    Prev
+                  </button>
+                  {[1, 2, 3].map((page) => (
                     <button
-                      key={tag}
-                      onClick={() => setActiveTag(tag)}
-                      className={`px-4 py-2 rounded-full border text-sm transition ${
-                        activeTag === tag
-                          ? "border-primary text-primary bg-primary/5"
-                          : "border-slate-200 text-slate-600 hover:border-primary/50"
+                      key={page}
+                      className={`w-10 h-10 rounded-full border ${
+                        page === 1
+                          ? "bg-primary text-white border-primary"
+                          : "border-slate-200 text-slate-600 hover:border-primary"
                       }`}
                     >
-                      {tag}
+                      {page}
                     </button>
                   ))}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center overflow-hidden rounded-full border border-slate-200">
-                    <button
-                      onClick={() => setView("grid")}
-                      className={`px-4 py-2 text-sm font-semibold inline-flex items-center gap-2 ${
-                        view === "grid"
-                          ? "bg-primary text-white"
-                          : "text-slate-600 hover:text-primary"
-                      }`}
-                    >
-                      <LayoutGrid size={16} /> Grid
-                    </button>
-                    <button
-                      onClick={() => setView("list")}
-                      className={`px-4 py-2 text-sm font-semibold inline-flex items-center gap-2 ${
-                        view === "list"
-                          ? "bg-primary text-white"
-                          : "text-slate-600 hover:text-primary"
-                      }`}
-                    >
-                      <ListIcon size={16} /> List
-                    </button>
-                  </div>
-
-                  <button className="h-10 px-4 rounded-full border border-slate-200 text-sm font-semibold text-slate-700 inline-flex items-center gap-2">
-                    Sort by <span className="text-slate-900">{sort}</span>
-                    <ChevronDown size={16} />
+                  <button className="px-4 h-10 rounded-full border border-slate-200 text-slate-600 bg-white">
+                    Next
                   </button>
                 </div>
               </div>
-
-              <div className="text-sm text-slate-600">
-                Showing <span className="font-semibold">{filtered.length}</span> products
-              </div>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-              {filtered.map((product) => (
-                <div
-                  key={product.id}
-                  className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden hover:shadow-md transition"
-                >
-                  <div className="relative">
-                    <div className="w-full h-56 bg-slate-100">
-                      <img
-                        src={product.image}
-                        alt={product.title}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    {product.badge && (
-                      <span className="absolute top-3 left-3 bg-white text-primary text-xs font-semibold px-3 py-1 rounded-full shadow-sm">
-                        {product.badge}
-                      </span>
-                    )}
-                    <button className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/80 backdrop-blur flex items-center justify-center text-slate-500 hover:text-primary shadow">
-                      <Heart size={18} />
-                    </button>
-                  </div>
-
-                  <div className="p-4 space-y-2">
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                      <span className="uppercase tracking-wide">{product.category}</span>
-                      <span className="text-slate-400">•</span>
-                      <span>{product.stock}</span>
-                    </div>
-                    <h3 className="text-lg font-semibold text-slate-900">{product.title}</h3>
-                    <div className="flex items-center gap-1 text-sm text-amber-500">
-                      <Star size={14} fill="currentColor" />{" "}
-                      <span className="text-slate-600">{product.rating.toFixed(1)}</span>
-                      <span className="text-slate-400">(0 reviews)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-2xl font-bold text-slate-900">
-                        ${product.price.toLocaleString()}
-                      </p>
-                      {product.originalPrice && (
-                        <p className="text-sm text-slate-400 line-through">
-                          ${product.originalPrice.toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 pt-2">
-                      <button className="flex-1 h-11 rounded-full border border-slate-200 font-semibold text-slate-700 hover:border-primary hover:text-primary transition inline-flex items-center justify-center gap-2">
-                        <Eye size={18} /> Quick view
-                      </button>
-                      <button className="flex-1 h-11 rounded-full bg-primary text-white font-semibold hover:bg-primary-hover transition inline-flex items-center justify-center gap-2">
-                        <ShoppingCart size={18} /> Add
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-8 pt-4 border-t border-slate-100">
-              <div className="text-sm text-slate-600">Page 1 of 3</div>
-              <div className="flex items-center gap-2">
-                <button className="px-4 h-10 rounded-full border border-slate-200 text-slate-500 bg-white">
-                  Prev
-                </button>
-                {[1, 2, 3].map((page) => (
-                  <button
-                    key={page}
-                    className={`w-10 h-10 rounded-full border ${
-                      page === 1
-                        ? "bg-primary text-white border-primary"
-                        : "border-slate-200 text-slate-600 hover:border-primary"
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-                <button className="px-4 h-10 rounded-full border border-slate-200 text-slate-600 bg-white">
-                  Next
-                </button>
-              </div>
-            </div>
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
-    </div>
-  );
-}
 
-function FilterBlock({ title, children }) {
-  return (
-    <div className="space-y-3">
-      <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
-        {title}
-      </div>
-      {children}
-    </div>
+      <QuickViewModal
+        product={quickProduct}
+        related={related}
+        onClose={() => setQuickProduct(null)}
+      />
+    </>
   );
 }

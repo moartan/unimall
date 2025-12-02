@@ -28,12 +28,15 @@ import employeeOrderRoutes from './routes/employee/orderRoutes.js';
 const app = express();
 
 app.use(helmet());
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-    credentials: true,
-  })
-);
+const corsConfig = {
+  origin: true, // reflect request origin (development-friendly)
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsConfig));
 app.use(express.json());
 app.use(cookieParser());
 app.use(csrfSkip);

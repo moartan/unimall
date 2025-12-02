@@ -1,22 +1,42 @@
-import { useState } from 'react';
-
-const mockEmail = {
-  current: 'mdartan4@gmail.com',
-  verified: true,
-};
+import { useEffect, useState } from 'react';
+import { useCpanel } from '../../context/CpanelProvider';
 
 export default function EmailVerification() {
-  const [email, setEmail] = useState(mockEmail.current);
-  const [verified, setVerified] = useState(mockEmail.verified);
+  const { user, api } = useCpanel();
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState({ loading: false, error: '', success: '' });
 
-  const handleSendVerification = () => {
-    setVerified(false);
-    // trigger verification flow
+  useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email);
+    }
+  }, [user]);
+
+  const sendChangeRequest = async () => {
+    if (!email) {
+      setStatus({ loading: false, error: 'Please enter an email.', success: '' });
+      return;
+    }
+    if (email === user?.email && user?.emailVerified) {
+      setStatus({ loading: false, error: '', success: 'Email is already verified.' });
+      return;
+    }
+    setStatus({ loading: true, error: '', success: '' });
+    try {
+      const { data } = await api.post('/auth/employee/email/change', { newEmail: email });
+      setStatus({ loading: false, error: '', success: data?.message || 'Check your email for the confirmation link.' });
+    } catch (err) {
+      const message = err?.response?.data?.message || 'Failed to send verification/change link.';
+      setStatus({ loading: false, error: message, success: '' });
+    }
   };
 
-  const handleChangeEmail = (e) => {
-    setEmail(e.target.value);
-    setVerified(false);
+  const handleSendVerification = async () => {
+    await sendChangeRequest();
+  };
+
+  const handleSaveEmail = async () => {
+    await sendChangeRequest();
   };
 
   return (
@@ -27,9 +47,9 @@ export default function EmailVerification() {
         <div className="flex items-center justify-between gap-2">
           <div>
             <p className="text-sm font-semibold text-ink dark:text-text-light">Current Email</p>
-            <p className="text-sm text-muted dark:text-text-light/80">{mockEmail.current}</p>
+            <p className="text-sm text-muted dark:text-text-light/80">{user?.email || '—'}</p>
           </div>
-          {verified ? (
+          {user?.emailVerified ? (
             <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">Verified</span>
           ) : (
             <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">Unverified</span>
@@ -42,7 +62,7 @@ export default function EmailVerification() {
             <input
               type="email"
               value={email}
-              onChange={handleChangeEmail}
+              onChange={(e) => setEmail(e.target.value)}
               className="rounded-lg border border-border bg-white px-3 py-2 text-sm text-ink outline-none ring-2 ring-transparent transition focus:border-[rgba(2,159,174,0.35)] focus:ring-[rgba(2,159,174,0.15)] dark:bg-dark-card dark:text-text-light"
             />
           </label>
@@ -51,15 +71,30 @@ export default function EmailVerification() {
           </p>
         </div>
 
+        {status.error ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{status.error}</div>
+        ) : null}
+        {status.success ? (
+          <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+            {status.success}
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
             onClick={handleSendVerification}
-            className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-accent transition hover:bg-primary-hover"
+            disabled={status.loading}
+            className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-accent transition hover:bg-primary-hover disabled:opacity-70"
           >
-            Send Verification
+            {status.loading ? 'Sending...' : 'Send Verification'}
           </button>
-          <button className="inline-flex items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-primary transition hover:border-primary">
+          <button
+            type="button"
+            onClick={handleSaveEmail}
+            disabled={status.loading}
+            className="inline-flex items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-primary transition hover:border-primary disabled:opacity-70"
+          >
             Save Email
           </button>
         </div>

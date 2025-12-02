@@ -1,14 +1,9 @@
 import axios from 'axios';
 import createError from 'http-errors';
 import User from '../../models/auth/User.js';
-import {
-  createSession,
-  issueTokens,
-  setRefreshCookie,
-  logAction,
-  notify,
-} from './authService.js';
+import { createSession, issueTokens, setRefreshCookie, logAction, notify } from './authService.js';
 import { hashToken } from '../../utils/tokens.js';
+import config from '../../config/env.js';
 
 const PROVIDERS = ['google', 'facebook', 'apple'];
 
@@ -116,8 +111,6 @@ const upsertSocialUser = async ({ provider, providerId, email, name, avatar, ema
       if (!user.name && name) user.name = name;
       if (!user.avatar && avatar) user.avatar = avatar;
       user.emailVerified = emailVerified;
-      user.isVerified = emailVerified;
-      user.isVerify = emailVerified;
       await user.save();
     }
   }
@@ -130,8 +123,6 @@ const upsertSocialUser = async ({ provider, providerId, email, name, avatar, ema
       name,
       avatar,
       emailVerified,
-      isVerified: emailVerified,
-      isVerify: emailVerified,
       status: 'active',
     });
     await notify(user._id, { title: 'Welcome to Unimall', body: 'Thanks for joining Unimall!' });
@@ -188,7 +179,7 @@ export const socialCallback = async (req, res, next) => {
     const rotated = issueTokens(user, session._id);
     session.refreshTokenHash = hashToken(rotated.refreshToken);
     await session.save();
-    setRefreshCookie(res, rotated.refreshToken);
+    setRefreshCookie(res, rotated.refreshToken, config.cookies.customerRefreshName);
     await logAction(user._id, `${provider}_login`, { ip: req.ip, userAgent: req.headers['user-agent'] });
 
     const safeUser = user.toObject();

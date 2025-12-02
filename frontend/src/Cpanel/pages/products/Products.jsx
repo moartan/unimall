@@ -1,3 +1,5 @@
+import { Navigate } from 'react-router-dom';
+
 export default function Products() {
-  return <div className="p-4">Cpanel Products</div>;
+  return <Navigate to="/cpanel/products/list" replace />;
 }

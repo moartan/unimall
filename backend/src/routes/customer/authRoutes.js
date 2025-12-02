@@ -25,7 +25,8 @@ router.post('/logout', logout);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 router.post('/email/verify', authGuard, requestEmailVerification);
-router.post('/email/confirm', authGuard, verifyEmail);
+// confirmation via emailed token does not require being logged in
+router.post('/email/confirm', verifyEmail);
 router.post('/email/add', authGuard, addEmailForSocial);
 router.post('/email/change', authGuard, requestEmailChange);
 router.post('/email/confirm-change', confirmEmailChange);

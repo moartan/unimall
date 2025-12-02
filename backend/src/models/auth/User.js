@@ -20,8 +20,7 @@ const userSchema = new mongoose.Schema(
     provider: { type: String, enum: AUTH_PROVIDERS, default: 'local' },
     email: { type: String, lowercase: true, trim: true },
     emailVerified: { type: Boolean, default: false },
-    isVerified: { type: Boolean, default: false },
-    isVerify: { type: Boolean, default: false },
+    smsVerified: { type: Boolean, default: false }, // reserved for future SMS verification
     password: { type: String },
     name: { type: String, trim: true },
     gender: { type: String, enum: GENDER, trim: true },

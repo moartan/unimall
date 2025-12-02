@@ -1,13 +1,48 @@
-const mockUser = {
-  fullName: 'System Admin',
-  email: 'mdartan4@gmail.com',
-  phone: '00905376054336',
-  country: 'Somalia',
-  gender: 'male',
-  role: 'Administrator',
-};
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useCpanel } from '../../context/CpanelProvider';
 
 export default function Overview() {
+  const { user, loading } = useCpanel();
+  const navigate = useNavigate();
+
+  const safeUser = useMemo(
+    () => ({
+      name: user?.name || '—',
+      email: user?.email || '—',
+      phone: user?.phone || '—',
+      country: user?.country || '—',
+      gender: user?.gender || '—',
+      role: user?.employeeRole ? user.employeeRole.toUpperCase() : user?.role || '—',
+      avatar: user?.avatar || '',
+      initials:
+        user?.name
+          ?.trim()
+          ?.split(' ')
+          ?.map((n) => n[0]?.toUpperCase())
+          ?.join('')
+          ?.slice(0, 2) ||
+        user?.email?.slice(0, 2)?.toUpperCase() ||
+        'NA',
+    }),
+    [user],
+  );
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        <div className="h-6 w-48 rounded bg-slate-200 dark:bg-slate-700 animate-pulse" />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-3">
+            <div className="h-40 rounded-xl bg-slate-200 dark:bg-slate-700 animate-pulse" />
+            <div className="h-28 rounded-xl bg-slate-200 dark:bg-slate-700 animate-pulse" />
+          </div>
+          <div className="h-64 rounded-xl bg-slate-200 dark:bg-slate-700 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-ink dark:text-text-light">Account Overview</h2>
@@ -17,12 +52,12 @@ export default function Overview() {
           <div className="rounded-xl bg-[#eef2f7] bg-opacity-60 p-5 border border-border/60">
             <h3 className="text-lg font-semibold text-ink dark:text-text-light">Personal Information</h3>
             <div className="mt-4 grid grid-cols-1 gap-y-4 text-sm text-ink dark:text-text-light md:grid-cols-2">
-              <InfoRow label="Full Name" value={mockUser.fullName} />
-              <InfoRow label="Email Address" value={mockUser.email} />
-              <InfoRow label="Phone Number" value={mockUser.phone} />
-              <InfoRow label="Country" value={mockUser.country} />
-              <InfoRow label="Gender" value={mockUser.gender} />
-              <InfoRow label="Role" value={mockUser.role} />
+              <InfoRow label="Full Name" value={safeUser.name} />
+              <InfoRow label="Email Address" value={safeUser.email} />
+              <InfoRow label="Phone Number" value={safeUser.phone} />
+              <InfoRow label="Country" value={safeUser.country} />
+              <InfoRow label="Gender" value={safeUser.gender} />
+              <InfoRow label="Role" value={safeUser.role} />
             </div>
           </div>
 
@@ -35,14 +70,14 @@ export default function Overview() {
             <div className="mt-4 flex flex-wrap gap-3">
               <button
                 type="button"
-                onClick={() => (window.location.href = '/cpanel/profile?tab=edit')}
+                onClick={() => navigate('/cpanel/profile?tab=edit')}
                 className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-accent transition hover:bg-primary-hover"
               >
                 Edit Profile
               </button>
               <button
                 type="button"
-                onClick={() => (window.location.href = '/cpanel/profile?tab=security')}
+                onClick={() => navigate('/cpanel/profile?tab=security')}
                 className="inline-flex items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-primary transition hover:border-primary"
               >
                 Manage Security
@@ -52,22 +87,23 @@ export default function Overview() {
         </div>
 
         <div className="rounded-xl bg-[#eef2f7] bg-opacity-60 p-5 border border-border/60 flex flex-col items-center">
-          <div className="flex h-28 w-28 items-center justify-center rounded-full bg-[#b8e2e8] text-primary text-3xl font-bold">
-            {mockUser.fullName
-              .split(' ')
-              .map((n) => n[0])
-              .join('')}
+          <div className="flex h-28 w-28 items-center justify-center rounded-full bg-[#b8e2e8] text-primary text-3xl font-bold overflow-hidden border border-border">
+            {safeUser.avatar ? (
+              <img src={safeUser.avatar} alt={safeUser.name} className="h-full w-full object-cover" />
+            ) : (
+              safeUser.initials
+            )}
           </div>
           <div className="mt-4 text-center">
-            <p className="text-lg font-semibold text-ink dark:text-text-light">{mockUser.fullName}</p>
-            <p className="text-sm text-muted dark:text-text-light/80">{mockUser.email}</p>
+            <p className="text-lg font-semibold text-ink dark:text-text-light">{safeUser.name}</p>
+            <p className="text-sm text-muted dark:text-text-light/80">{safeUser.email}</p>
           </div>
           <span className="mt-3 rounded-full bg-[#b8e2e8] px-3 py-1 text-xs font-semibold text-ink dark:text-text-light">
-            {mockUser.role}
+            {safeUser.role}
           </span>
           <button
             type="button"
-            onClick={() => (window.location.href = '/cpanel/profile?tab=image')}
+            onClick={() => navigate('/cpanel/profile?tab=image')}
             className="mt-4 inline-flex items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-primary transition hover:border-primary"
           >
             Change Profile Image

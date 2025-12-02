@@ -14,7 +14,8 @@ const validateEnv = () => {
 validateEnv();
 
 const config = {
-  port: process.env.PORT || 5000,
+  // Pick a non-conflicting default port; override via PORT env if needed
+  port: process.env.PORT || 8081,
   mongoUri: process.env.MONGO_URI,
   jwt: {
     accessSecret: process.env.JWT_SECRET,
@@ -23,7 +24,8 @@ const config = {
     refreshExpiresInMs: 24 * 60 * 60 * 1000, // 24 hours
   },
   cookies: {
-    refreshName: 'refreshToken',
+    customerRefreshName: 'customerRefreshToken',
+    employeeRefreshName: 'employeeRefreshToken',
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
   },

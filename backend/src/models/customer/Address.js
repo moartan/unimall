@@ -19,14 +19,13 @@ const addressSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-addressSchema.pre('save', async function ensureSingleDefault(next) {
+addressSchema.pre('save', async function ensureSingleDefault() {
   if (this.isModified('isDefault') && this.isDefault) {
     await this.constructor.updateMany(
       { user: this.user, _id: { $ne: this._id } },
       { $set: { isDefault: false } }
     );
   }
-  next();
 });
 
 addressSchema.pre('validate', function setCode() {

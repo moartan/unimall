@@ -1,23 +1,65 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import Home from '../pages/home/Home.jsx';
 import Products from '../pages/products/Products.jsx';
-import Auth from '../pages/auth/Auth.jsx';
+import Trending from '../pages/products/Trending.jsx';
+import Login from '../pages/auth/Login.jsx';
+import ForgotPassword from '../pages/auth/ForgotPassword.jsx';
+import ResetPassword from '../pages/auth/ResetPassword.jsx';
+import Register from '../pages/auth/Register.jsx';
+import VerifyEmail from '../pages/auth/VerifyEmail.jsx';
+import ConfirmEmailChange from '../pages/auth/ConfirmEmailChange.jsx';
 import Checkout from '../pages/checkout/Checkout.jsx';
+import ProductDetails from '../pages/products/details/ProductDetails.jsx';
 import Profile from '../pages/profile/Profile.jsx';
 import Orders from '../pages/orders/Orders.jsx';
 import Wishlist from '../pages/wishlist/Wishlist.jsx';
+import NotFound from '../pages/NotFound.jsx';
+import PublicPpanel from './PublicPpanel.jsx';
+import ProtectedPpanel from './ProtectedPpanel.jsx';
 
 export default function PpanelRoutes() {
   return (
     <Routes>
       <Route index element={<Home />} />
       <Route path="products" element={<Products />} />
-      <Route path="auth" element={<Auth />} />
+      <Route path="products/trending" element={<Trending />} />
+      <Route path="products/details/:slugOrId" element={<ProductDetails />} />
+
+      <Route element={<PublicPpanel />}>
+        <Route path="login" element={<Login />} />
+        <Route path="forgot-password" element={<ForgotPassword />} />
+        <Route path="register" element={<Register />} />
+        <Route path="reset-password/:token" element={<ResetPassword />} />
+        <Route path="verify-email" element={<VerifyEmail />} />
+        <Route path="confirm-email-change" element={<ConfirmEmailChange />} />
+      </Route>
+
       <Route path="checkout" element={<Checkout />} />
-      <Route path="profile" element={<Profile />} />
-      <Route path="orders" element={<Orders />} />
-      <Route path="wishlist" element={<Wishlist />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route
+        path="profile"
+        element={
+          <ProtectedPpanel>
+            <Profile />
+          </ProtectedPpanel>
+        }
+      />
+      <Route
+        path="orders"
+        element={
+          <ProtectedPpanel>
+            <Orders />
+          </ProtectedPpanel>
+        }
+      />
+      <Route
+        path="wishlist"
+        element={
+          <ProtectedPpanel>
+            <Wishlist />
+          </ProtectedPpanel>
+        }
+      />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }
