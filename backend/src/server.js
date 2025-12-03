@@ -33,8 +33,6 @@ app.use(helmet());
 // --- CORS CONFIG: allow Vercel + local dev ---
 const allowedOrigins = [
   "http://localhost:5173",
-  "http://localhost:3000",
-  "http://localhost:8080",
   "https://unimall-wine.vercel.app",
   process.env.CORS_ORIGIN,
 ].filter(Boolean);

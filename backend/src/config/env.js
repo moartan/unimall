@@ -26,8 +26,9 @@ const config = {
   cookies: {
     customerRefreshName: 'customerRefreshToken',
     employeeRefreshName: 'employeeRefreshToken',
+    // In production we must allow cross-site cookies for the frontend domain
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   },
   email: {
     host: process.env.SMTP_HOST,
