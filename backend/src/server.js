@@ -39,7 +39,7 @@ const allowedOrigins = [
   process.env.CORS_ORIGIN,
 ].filter(Boolean);
 
-app.use(cors({
+const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true); // allow curl/postman
     if (allowedOrigins.includes(origin)) return callback(null, true);
@@ -48,8 +48,16 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-}));
-app.options('*', cors());
+};
+
+app.use(cors(corsOptions));
+// Short-circuit OPTIONS globally to avoid path-to-regexp issues in Express 5
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
 
 app.use(express.json());
 app.use(cookieParser());
