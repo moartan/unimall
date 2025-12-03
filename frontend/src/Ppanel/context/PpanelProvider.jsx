@@ -50,15 +50,30 @@ export default function PpanelProvider({ children }) {
       setLoading(false);
       return;
     }
+
+    const withTimeout = async (promise, ms = 5000) => {
+      let timeoutId;
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('bootstrap_timeout')), ms);
+      });
+      try {
+        return await Promise.race([promise, timeoutPromise]);
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    };
+
     const bootstrap = async () => {
       try {
-        const refreshRes = await baseClient.post('/auth/customer/refresh', {});
+        const refreshRes = await withTimeout(baseClient.post('/auth/customer/refresh', {}));
         const token = refreshRes.data?.accessToken;
         if (token) {
           setToken(token);
-          const profileRes = await api.get('/customer/profile', {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const profileRes = await withTimeout(
+            api.get('/customer/profile', {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+          );
           setUser(profileRes.data?.user || null);
         }
       } catch (err) {
