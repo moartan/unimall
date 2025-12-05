@@ -12,10 +12,11 @@ const parsePagination = (req) => {
   return { page, limit, skip };
 };
 
-const buildFilters = (req) => {
+const buildFilters = (req, resolvedCategoryId = null) => {
   const filter = { isDeleted: { $ne: true } };
   if (req.query.status) filter.status = req.query.status;
-  if (req.query.category) filter.category = req.query.category;
+  if (resolvedCategoryId) filter.category = resolvedCategoryId;
+  else if (req.query.category) filter.category = req.query.category;
   if (req.query.q) {
     filter.$text = { $search: req.query.q };
   }
@@ -124,7 +125,17 @@ export const updateProduct = async (req, res, next) => {
 export const listProducts = async (req, res, next) => {
   try {
     const { page, limit, skip } = parsePagination(req);
-    const filter = buildFilters(req);
+    let categoryId = null;
+    if (req.query.category) {
+      if (mongoose.Types.ObjectId.isValid(req.query.category)) {
+        categoryId = req.query.category;
+      } else {
+        const cat = await Category.findOne({ slug: req.query.category, isDeleted: { $ne: true } });
+        if (cat) categoryId = cat._id;
+        else return res.json({ products: [], page, limit, total: 0 });
+      }
+    }
+    const filter = buildFilters(req, categoryId);
     const sort = req.query.sort || '-createdAt';
     const [products, total] = await Promise.all([
       Product.find(filter).sort(sort).skip(skip).limit(limit).populate('category'),
@@ -139,7 +150,17 @@ export const listProducts = async (req, res, next) => {
 export const listPublishedProducts = async (req, res, next) => {
   try {
     const { page, limit, skip } = parsePagination(req);
-    const filter = buildFilters(req);
+    let categoryId = null;
+    if (req.query.category) {
+      if (mongoose.Types.ObjectId.isValid(req.query.category)) {
+        categoryId = req.query.category;
+      } else {
+        const cat = await Category.findOne({ slug: req.query.category, isDeleted: { $ne: true } });
+        if (cat) categoryId = cat._id;
+        else return res.json({ products: [], page, limit, total: 0 });
+      }
+    }
+    const filter = buildFilters(req, categoryId);
     filter.status = 'Published';
 
     if (req.query.minPrice || req.query.maxPrice) {
