@@ -24,6 +24,7 @@ import customerWishlistRoutes from './routes/customer/wishlistRoutes.js';
 import customerCartRoutes from './routes/customer/cartRoutes.js';
 import customerOrderRoutes from './routes/customer/orderRoutes.js';
 import employeeOrderRoutes from './routes/employee/orderRoutes.js';
+import catalogCategoryRoutes from './routes/catalog/categoryRoutes.js';
 
 const app = express();
 
@@ -45,7 +46,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
 };
 
 app.use(cors(corsOptions));
@@ -87,6 +88,7 @@ app.use('/employee/notifications', employeeNotificationRoutes);
 app.use('/employee/categories', employeeCategoryRoutes);
 app.use('/employee/products', employeeProductRoutes);
 app.use('/catalog/products', catalogProductRoutes);
+app.use('/catalog/categories', catalogCategoryRoutes);
 app.use('/employee/media', employeeMediaRoutes);
 app.use('/customer/wishlist', customerWishlistRoutes);
 app.use('/customer/cart', customerCartRoutes);

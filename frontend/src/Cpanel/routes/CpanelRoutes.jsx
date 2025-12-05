@@ -6,6 +6,8 @@ import ResetPassword from '../pages/auth/ResetPassword';
 import Dashboard from '../pages/dashboard/Dashboard';
 import Profile from '../pages/profile/Profile';
 import Products from '../pages/products/Products';
+import ProductTable from '../pages/products/ProductTable';
+import ProductGrid from '../pages/products/ProductGrid';
 import ProductList from '../pages/products/ProductList';
 import AddProduct from '../pages/products/AddProduct';
 import Categories from '../pages/categories/Categories';
@@ -36,12 +38,16 @@ export default function CpanelRoutes() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="profile/*" element={<Profile />} />
           <Route path="products" element={<Navigate to="products/list" replace />} />
-          <Route path="products/list" element={<ProductList />} />
+          <Route path="products/list" element={<ProductTable />} />
+          <Route path="products/grid" element={<ProductGrid />} />
+          <Route path="products/customer-list" element={<ProductList />} />
           <Route path="products/add" element={<AddProduct />} />
+          <Route path="products/edit/:productId" element={<AddProduct />} />
           <Route path="products/*" element={<Products />} />
           <Route path="categories" element={<Navigate to="categories/list" replace />} />
           <Route path="categories/list" element={<CategoryList />} />
           <Route path="categories/add" element={<AddCategory />} />
+          <Route path="categories/edit/:categoryId" element={<AddCategory />} />
           <Route path="categories/*" element={<Categories />} />
           <Route path="orders/*" element={<Orders />} />
           <Route path="invoices/*" element={<Invoices />} />

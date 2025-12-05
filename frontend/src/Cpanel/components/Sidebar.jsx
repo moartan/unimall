@@ -12,6 +12,7 @@ import {
   FaPlusCircle,
   FaList,
   FaThLarge,
+  FaListAlt,
   FaFileInvoice,
   FaChartLine,
   FaCogs,
@@ -181,10 +182,13 @@ export default function Sidebar() {
                 <FaPlusCircle className="text-[13px]" /> Add Product
               </NavLink>
               <NavLink to="/cpanel/products/list" className={subLinkClass}>
-                <FaList className="text-[13px]" /> Product List
+                <FaList className="text-[13px]" /> Product Table
               </NavLink>
               <NavLink to="/cpanel/products/grid" className={subLinkClass}>
                 <FaThLarge className="text-[13px]" /> Grid View
+              </NavLink>
+              <NavLink to="/cpanel/products/customer-list" className={subLinkClass}>
+                <FaListAlt className="text-[13px]" /> List View
               </NavLink>
             </motion.div>
           )}

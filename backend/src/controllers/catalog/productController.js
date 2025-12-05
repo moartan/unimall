@@ -1,4 +1,5 @@
 import createError from 'http-errors';
+import mongoose from 'mongoose';
 import Product from '../../models/catalog/Product.js';
 import Category from '../../models/catalog/Category.js';
 import { logAction } from '../auth/authService.js';
@@ -90,7 +91,7 @@ export const createProduct = async (req, res, next) => {
 
 export const updateProduct = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const { idOrSlug } = req.params;
     const payload = { ...req.body, updatedBy: req.user._id };
     if (payload.category) {
       const categoryExists = await Category.findOne({ _id: payload.category, isDeleted: { $ne: true } });
@@ -98,18 +99,22 @@ export const updateProduct = async (req, res, next) => {
     }
     if (payload.images) payload.images = sanitizeImages(payload.images);
     if (payload.variants) payload.variants = validateVariants(payload.variants, payload.sku);
-    await ensureGlobalSkuUniqueness(payload.sku, (payload.variants || []).map((v) => v.sku), id);
-    const product = await Product.findOneAndUpdate(
-      { _id: id, isDeleted: { $ne: true } },
-      payload,
-      { new: true, runValidators: true }
-    );
+    const product = await Product.findOne({
+      $and: [
+        { isDeleted: { $ne: true } },
+        { $or: [{ _id: idOrSlug }, { slug: idOrSlug }] },
+      ],
+    });
+    if (!product) throw createError(404, 'Product not found');
+    await ensureGlobalSkuUniqueness(payload.sku, (payload.variants || []).map((v) => v.sku), product._id);
+    Object.assign(product, payload);
+    await product.save();
     if (!product) throw createError(404, 'Product not found');
     // optional: cleanup removed images if publicIds provided as toRemove
     if (payload.removeImagePublicIds && Array.isArray(payload.removeImagePublicIds)) {
       await Promise.all(payload.removeImagePublicIds.map((pid) => deleteAsset(pid)));
     }
-    await logAction(req.user._id, 'product_update', { metadata: { id } });
+    await logAction(req.user._id, 'product_update', { metadata: { id: product._id } });
     res.json({ product });
   } catch (err) {
     next(err);
@@ -161,10 +166,16 @@ export const listPublishedProducts = async (req, res, next) => {
 export const getProduct = async (req, res, next) => {
   try {
     const { idOrSlug } = req.params;
+    const asObjectId = mongoose.Types.ObjectId.isValid(idOrSlug) ? idOrSlug : null;
     const product = await Product.findOne({
       $and: [
         { isDeleted: { $ne: true } },
-        { $or: [{ _id: idOrSlug }, { slug: idOrSlug }] },
+        {
+          $or: [
+            ...(asObjectId ? [{ _id: asObjectId }] : []),
+            { slug: idOrSlug },
+          ],
+        },
       ],
     }).populate('category');
     if (!product) throw createError(404, 'Product not found');

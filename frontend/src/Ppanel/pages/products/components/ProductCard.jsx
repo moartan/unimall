@@ -1,10 +1,13 @@
 import { Heart, ShoppingCart, Eye, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useCart } from "../../../context/useCart.jsx";
+import { useWishlist } from "../../../context/useWishlist";
 
 export default function ProductCard({ product, onQuickView }) {
   const { items = [], addItem, setQuantity } = useCart();
   const cartItem = items.find((i) => i.id === product.id);
+  const { items: wishItems = [], addItem: addWish, removeItem: removeWish } = useWishlist() || {};
+  const inWishlist = wishItems.some((w) => w.id === product.id || w.productId === product.id);
 
   const inc = () => {
     if (cartItem) {
@@ -33,8 +36,21 @@ export default function ProductCard({ product, onQuickView }) {
             {product.badge}
           </span>
         )}
-        <button className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/80 backdrop-blur flex items-center justify-center text-slate-500 hover:text-primary shadow">
-          <Heart size={18} />
+        <button
+          className={`absolute top-3 right-3 w-9 h-9 rounded-full backdrop-blur flex items-center justify-center shadow ${
+            inWishlist ? "bg-primary text-white" : "bg-white/80 text-slate-500 hover:text-primary"
+          }`}
+          onClick={() => {
+            if (inWishlist) {
+              removeWish && removeWish(product.id);
+            } else {
+              addWish && addWish(product.id);
+            }
+            onQuickView?.(null);
+          }}
+          title={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+        >
+          <Heart size={18} fill={inWishlist ? "currentColor" : "none"} />
         </button>
       </div>
 

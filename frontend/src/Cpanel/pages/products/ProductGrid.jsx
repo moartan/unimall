@@ -10,7 +10,7 @@ const statusClass = (status) =>
     ? 'bg-emerald-100 text-emerald-700'
     : 'bg-amber-100 text-amber-700';
 
-export default function ProductList() {
+export default function ProductGrid() {
   const { api, user } = useCpanel();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('Published');
@@ -22,7 +22,7 @@ export default function ProductList() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
-  const pageSize = 10;
+  const pageSize = 9;
   const isAdmin = user?.employeeRole === 'admin';
 
   const fetchCategories = useMemo(
@@ -109,8 +109,8 @@ export default function ProductList() {
       <div className="p-1 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-text-primary dark:text-text-light">Product List (Customer style)</h1>
-            <p className="text-sm text-text-secondary dark:text-text-light/70">Preview list view similar to storefront.</p>
+            <h1 className="text-2xl font-bold text-text-primary dark:text-text-light">Product Grid</h1>
+            <p className="text-sm text-text-secondary dark:text-text-light/70">Preview customer-style grid.</p>
           </div>
         </div>
 
@@ -184,7 +184,7 @@ export default function ProductList() {
             </div>
           ) : null}
 
-          <div className="space-y-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {products.map((product) => {
               const image = product.images?.[0]?.url;
               const publicLink = product.slug
@@ -193,12 +193,12 @@ export default function ProductList() {
                   ? `/products/details/${product._id}`
                   : '/products';
               return (
-                <div key={product._id} className="rounded-2xl border border-primary/10 bg-white dark:bg-dark-card shadow-soft dark:shadow-strong overflow-hidden flex flex-col md:flex-row">
-                  <div className="md:w-52 w-full h-52 md:h-52 relative flex-shrink-0">
+                <div key={product._id} className="rounded-2xl border border-primary/10 bg-white dark:bg-dark-card shadow-soft dark:shadow-strong overflow-hidden flex flex-col">
+                  <div className="relative">
                     {image ? (
-                      <img src={image} alt={product.name} className="w-full h-full object-cover object-center" />
+                      <img src={image} alt={product.name} className="w-full h-48 object-cover" />
                     ) : (
-                      <div className="w-full h-full bg-light-bg dark:bg-dark-hover flex items-center justify-center text-text-secondary">No image</div>
+                      <div className="w-full h-48 bg-light-bg dark:bg-dark-hover flex items-center justify-center text-text-secondary">No image</div>
                     )}
                     <div className="absolute top-3 left-3 flex flex-wrap gap-2">
                       {product.isFeatured ? (
@@ -211,15 +211,15 @@ export default function ProductList() {
                         <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">Exclusive</span>
                       ) : null}
                     </div>
-                  </div>
-                  <div className="flex-1 p-4 space-y-2 flex flex-col">
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs uppercase tracking-wide text-text-secondary dark:text-text-light/70">
-                        {product.category?.name || 'Uncategorized'} · {product.stock ?? 0} in stock
-                      </div>
+                    <div className="absolute top-3 right-3">
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusClass(product.status)}`}>
                         {product.status}
                       </span>
+                    </div>
+                  </div>
+                  <div className="p-4 space-y-2 flex-1">
+                    <div className="text-xs uppercase tracking-wide text-text-secondary dark:text-text-light/70">
+                      {product.category?.name || 'Uncategorized'} · {product.stock ?? 0} in stock
                     </div>
                     <div className="text-lg font-semibold text-text-primary dark:text-text-light">{product.name}</div>
                     <div className="text-sm text-text-secondary dark:text-text-light/70 line-clamp-2">
@@ -235,41 +235,39 @@ export default function ProductList() {
                         </div>
                       ) : null}
                     </div>
-                    <div className="flex flex-wrap items-center justify-between gap-2 pt-2 mt-auto">
-                      <div className="flex flex-wrap gap-2">
-                        {product.tags?.slice(0, 6).map((tag) => (
-                          <span key={tag} className="px-2 py-1 rounded-full bg-light-bg dark:bg-dark-hover text-xs text-text-secondary border border-primary/10">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                          to={publicLink}
-                          className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-primary/20 text-text-primary dark:text-text-light hover:bg-primary/10 transition text-sm"
-                          title="View public page"
-                        >
-                          <FiExternalLink /> View
-                        </Link>
-                        <Link
-                          to={`/cpanel/products/edit/${product._id}`}
-                          className="inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-primary/20 text-text-primary dark:text-text-light hover:bg-primary/10 transition text-sm"
-                          title="Edit"
-                        >
-                          <FiEdit2 /> Edit
-                        </Link>
-                        {isAdmin ? (
-                          <button
-                            disabled={deletingId === product._id}
-                            onClick={() => handleDelete(product._id)}
-                            className="p-2 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 transition disabled:opacity-50"
-                            title="Delete"
-                          >
-                            <FiTrash2 />
-                          </button>
-                        ) : null}
-                      </div>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {product.tags?.slice(0, 4).map((tag) => (
+                        <span key={tag} className="px-2 py-1 rounded-full bg-light-bg dark:bg-dark-hover text-xs text-text-secondary border border-primary/10">
+                          {tag}
+                        </span>
+                      ))}
                     </div>
+                  </div>
+                  <div className="flex items-center gap-2 px-4 pb-4">
+                    <Link
+                      to={publicLink}
+                      className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-primary/20 text-text-primary dark:text-text-light hover:bg-primary/10 transition text-sm"
+                      title="View public page"
+                    >
+                      <FiExternalLink /> View
+                    </Link>
+                    <Link
+                      to={`/cpanel/products/edit/${product._id}`}
+                      className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-primary/20 text-text-primary dark:text-text-light hover:bg-primary/10 transition text-sm"
+                      title="Edit"
+                    >
+                      <FiEdit2 /> Edit
+                    </Link>
+                    {isAdmin ? (
+                      <button
+                        disabled={deletingId === product._id}
+                        onClick={() => handleDelete(product._id)}
+                        className="p-2 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 transition disabled:opacity-50"
+                        title="Delete"
+                      >
+                        <FiTrash2 />
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               );

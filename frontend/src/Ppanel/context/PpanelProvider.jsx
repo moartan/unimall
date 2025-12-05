@@ -11,6 +11,7 @@ export default function PpanelProvider({ children }) {
   const refreshTimer = useRef(null);
   const isPpanelRoute =
     typeof window !== 'undefined' && !window.location.pathname.startsWith('/cpanel');
+  const csrfRef = useRef(null);
 
   const setToken = (token) => {
     tokenRef.current = token;
@@ -29,6 +30,14 @@ export default function PpanelProvider({ children }) {
 
   const refreshSession = useCallback(async () => {
     try {
+      if (!csrfRef.current) {
+        const csrfRes = await baseClient.get('/csrf-token');
+        csrfRef.current = csrfRes.data?.csrfToken;
+        if (csrfRef.current) {
+          api.defaults.headers.common['X-CSRF-Token'] = csrfRef.current;
+          baseClient.defaults.headers.common['X-CSRF-Token'] = csrfRef.current;
+        }
+      }
       const refreshRes = await baseClient.post('/auth/customer/refresh', {});
       const token = refreshRes.data?.accessToken;
       if (token) {
@@ -65,6 +74,14 @@ export default function PpanelProvider({ children }) {
 
     const bootstrap = async () => {
       try {
+        if (!csrfRef.current) {
+          const csrfRes = await baseClient.get('/csrf-token');
+          csrfRef.current = csrfRes.data?.csrfToken;
+          if (csrfRef.current) {
+            api.defaults.headers.common['X-CSRF-Token'] = csrfRes.data?.csrfToken;
+            baseClient.defaults.headers.common['X-CSRF-Token'] = csrfRes.data?.csrfToken;
+          }
+        }
         const refreshRes = await withTimeout(baseClient.post('/auth/customer/refresh', {}));
         const token = refreshRes.data?.accessToken;
         if (token) {
@@ -101,6 +118,14 @@ export default function PpanelProvider({ children }) {
 
   const login = useCallback(
     async (email, password) => {
+      if (!csrfRef.current) {
+        const csrfRes = await baseClient.get('/csrf-token');
+        csrfRef.current = csrfRes.data?.csrfToken;
+        if (csrfRef.current) {
+          api.defaults.headers.common['X-CSRF-Token'] = csrfRef.current;
+          baseClient.defaults.headers.common['X-CSRF-Token'] = csrfRef.current;
+        }
+      }
       const { data } = await api.post('/auth/customer/login', { email, password });
       setUser(data.user);
       setToken(data.accessToken);

@@ -1,57 +1,55 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { FiEye } from 'react-icons/fi';
-
-const mockCategories = [
-  {
-    id: 'CTC-89750FPZ',
-    name: 'Mobile',
-    order: 1,
-    status: 'Active',
-    products: 128,
-    image: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=200&q=80',
-  },
-  {
-    id: 'CTC-P95RNA5B',
-    name: 'Laptop',
-    order: 2,
-    status: 'Active',
-    products: 86,
-    image: '',
-  },
-  {
-    id: 'CTC-4SPDKA2G',
-    name: 'Watch',
-    order: 3,
-    status: 'Active',
-    products: 64,
-    image: '',
-  },
-  {
-    id: 'CTC-RPEZENBO',
-    name: 'Camera',
-    order: 4,
-    status: 'Active',
-    products: 52,
-    image: '',
-  },
-  {
-    id: 'CTC-DK9VHUOS',
-    name: 'Audio',
-    order: 5,
-    status: 'Active',
-    products: 74,
-    image: '',
-  },
-  {
-    id: 'CTC-FEB3YVN6',
-    name: 'Tablet',
-    order: 6,
-    status: 'Active',
-    products: 91,
-    image: '',
-  },
-];
+import { useCpanel } from '../../context/CpanelProvider';
+import { deleteCategory, getCategories } from '../../api/catalog';
 
 export default function CategoryList() {
+  const { api, user } = useCpanel();
+  const [categories, setCategories] = useState([]);
+  const [status, setStatus] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
+  const isAdmin = user?.employeeRole === 'admin';
+
+  const fetchCategories = useMemo(
+    () => async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const params = {};
+        if (status !== 'all') params.status = status;
+        const res = await getCategories(api, params);
+        setCategories(res.data?.categories || []);
+      } catch (err) {
+        setError(err.response?.data?.message || 'Failed to load categories');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [api, status],
+  );
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  const handleDelete = async (id) => {
+    if (!isAdmin) return;
+    const confirmed = window.confirm('Delete this category? Products will remain but category becomes unavailable.');
+    if (!confirmed) return;
+    setDeletingId(id);
+    try {
+      await deleteCategory(api, id);
+      fetchCategories();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to delete category');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -60,12 +58,18 @@ export default function CategoryList() {
           <p className="text-sm text-text-secondary dark:text-text-light/70">Organize products and set display order.</p>
         </div>
         <div className="flex gap-2">
-          <button className="px-4 py-2 rounded-lg border border-primary/20 text-text-primary dark:text-text-light hover:bg-primary/10 transition">
-            Import
-          </button>
-          <button className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold shadow-soft transition">
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 text-sm text-text-primary dark:text-text-light"
+          >
+            <option value="all">All statuses</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+          <Link to="/cpanel/categories/add" className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold shadow-soft transition">
             + Add Category
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -82,8 +86,22 @@ export default function CategoryList() {
               </tr>
             </thead>
             <tbody>
-              {mockCategories.map((cat) => (
-                <tr key={cat.id} className="border-t border-primary/10">
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-text-secondary dark:text-text-light/70">
+                    Loading categories...
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && error ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-rose-600">
+                    {error}
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && !error && categories.map((cat) => (
+                <tr key={cat._id || cat.id} className="border-t border-primary/10">
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
                       {cat.image ? (
@@ -95,22 +113,53 @@ export default function CategoryList() {
                       )}
                       <div>
                         <div className="font-semibold text-text-primary dark:text-text-light text-base">{cat.name}</div>
-                        <div className="text-xs text-text-secondary dark:text-text-light/70">{cat.id}</div>
+                        <div className="text-xs text-text-secondary dark:text-text-light/70">
+                          {cat.categoryCode || cat.id}
+                        </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-4 text-text-primary dark:text-text-light font-semibold">{cat.order}</td>
-                  <td className="px-4 py-4 text-text-primary dark:text-text-light font-semibold">{cat.products}</td>
+                  <td className="px-4 py-4 text-text-primary dark:text-text-light font-semibold">{cat.displayOrder}</td>
+                  <td className="px-4 py-4 text-text-primary dark:text-text-light font-semibold">{cat.productCount ?? 0}</td>
                   <td className="px-4 py-4">
-                    <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">{cat.status}</span>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        cat.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                      }`}
+                    >
+                      {cat.status}
+                    </span>
                   </td>
                   <td className="px-4 py-4 text-right">
-                    <button className="p-2 rounded-lg border border-primary/15 text-text-secondary hover:bg-primary/10 transition">
-                      <FiEye />
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      <Link
+                        to={`/cpanel/categories/edit/${cat._id || cat.id}`}
+                        className="p-2 rounded-lg border border-primary/15 text-text-secondary hover:bg-primary/10 transition"
+                        title="Edit"
+                      >
+                        <FiEye />
+                      </Link>
+                      {isAdmin ? (
+                        <button
+                          disabled={deletingId === (cat._id || cat.id)}
+                          onClick={() => handleDelete(cat._id || cat.id)}
+                          className="p-2 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 transition disabled:opacity-50"
+                          title="Delete"
+                        >
+                          ✕
+                        </button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
+              {!loading && !error && categories.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-text-secondary dark:text-text-light/70">
+                    No categories found.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>

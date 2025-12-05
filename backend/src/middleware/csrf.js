@@ -7,7 +7,6 @@ const csrfProtection = csrf({ cookie: true });
 export const csrfSkip = (req, res, next) => {
   const path = req.path || '';
   if (
-    path === '/csrf-token' ||
     path === '/auth/customer/login' ||
     path === '/auth/employee/login' ||
     path === '/auth/customer/logout' ||

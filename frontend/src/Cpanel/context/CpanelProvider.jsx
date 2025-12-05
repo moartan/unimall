@@ -10,6 +10,7 @@ export default function CpanelProvider({ children }) {
   const tokenRef = useRef(null);
   const refreshTimer = useRef(null);
   const isCpanelRoute = typeof window !== 'undefined' && window.location.pathname.startsWith('/cpanel');
+  const csrfRef = useRef(null);
 
   const setToken = (token) => {
     tokenRef.current = token;
@@ -28,6 +29,14 @@ export default function CpanelProvider({ children }) {
 
   const refreshSession = useCallback(async () => {
     try {
+      if (!csrfRef.current) {
+        const res = await baseClient.get('/csrf-token');
+        csrfRef.current = res.data?.csrfToken;
+        if (csrfRef.current) {
+          api.defaults.headers.common['X-CSRF-Token'] = csrfRef.current;
+          baseClient.defaults.headers.common['X-CSRF-Token'] = csrfRef.current;
+        }
+      }
       const refreshRes = await baseClient.post('/auth/employee/refresh', {});
       const token = refreshRes.data?.accessToken;
       if (token) {
@@ -61,8 +70,23 @@ export default function CpanelProvider({ children }) {
       setLoading(false);
       return;
     }
+    const ensureCsrf = async () => {
+      try {
+        if (!csrfRef.current) {
+          const res = await baseClient.get('/csrf-token');
+          csrfRef.current = res.data?.csrfToken;
+          if (csrfRef.current) {
+            api.defaults.headers.common['X-CSRF-Token'] = csrfRef.current;
+            baseClient.defaults.headers.common['X-CSRF-Token'] = csrfRef.current;
+          }
+        }
+      } catch (_err) {
+        // if csrf fetch fails, subsequent requests will surface errors
+      }
+    };
     const bootstrap = async () => {
       try {
+        await ensureCsrf();
         const refreshRes = await baseClient.post('/auth/employee/refresh', {});
         const token = refreshRes.data?.accessToken;
         if (token) {

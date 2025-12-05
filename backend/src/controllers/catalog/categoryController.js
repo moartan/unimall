@@ -41,8 +41,33 @@ export const listCategories = async (req, res, next) => {
     const { page, limit, skip } = parsePagination(req);
     const filter = { isDeleted: { $ne: true } };
     if (req.query.status) filter.status = req.query.status;
+
+    const pipeline = [
+      { $match: filter },
+      { $sort: { displayOrder: 1, createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $lookup: {
+          from: 'products',
+          let: { categoryId: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $and: [{ $eq: ['$category', '$$categoryId'] }, { $ne: ['$isDeleted', true] }] } } },
+            { $count: 'count' },
+          ],
+          as: 'productMeta',
+        },
+      },
+      {
+        $addFields: {
+          productCount: { $ifNull: [{ $arrayElemAt: ['$productMeta.count', 0] }, 0] },
+        },
+      },
+      { $project: { productMeta: 0 } },
+    ];
+
     const [categories, total] = await Promise.all([
-      Category.find(filter).sort({ displayOrder: 1, createdAt: -1 }).skip(skip).limit(limit),
+      Category.aggregate(pipeline),
       Category.countDocuments(filter),
     ]);
     res.json({ categories, page, limit, total });

@@ -3,9 +3,10 @@ import { LayoutGrid, List as ListIcon, ChevronDown } from "lucide-react";
 import ProductFilter from "./components/ProductFilter";
 import ProductList from "./components/ProductList";
 import QuickViewModal from "./components/QuickViewModal";
+import { fetchPublishedProducts, fetchCategories } from "../../api/catalog";
 
-const categories = [
-  { label: "All categories", value: "all", desc: "Show everything that is published" },
+const staticAllCategory = { label: "All categories", value: "all", desc: "Show everything that is published" };
+const staticDefaults = [
   { label: "Mobile", value: "mobile", desc: "for all mobiles" },
   { label: "Laptop", value: "laptop", desc: "Laptops and ultrabooks" },
   { label: "Watch", value: "watch", desc: "Smart watches & wearables" },
@@ -27,90 +28,6 @@ const ratings = [
   { label: "3.5 ★ & up", value: 3.5 },
 ];
 
-const products = [
-  {
-    id: 1,
-    title: "Sony A6700 Creator Bundle",
-    category: "camera",
-    stock: "18 units ready",
-    price: 1699,
-    originalPrice: 1799,
-    badge: "Featured",
-    rating: 0,
-    shortDesc: "Compact APS-C camera with 4K120 recording and AI autofocus.",
-    warranty: "Includes 2-year warranty",
-    tags: ["sony a6700", "creator kit", "4k120"],
-    image: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: 2,
-    title: "Apple Vision Pro Lite",
-    category: "tablet",
-    stock: "Only 10 left",
-    price: 2299,
-    badge: "Featured",
-    rating: 0,
-    shortDesc: "Lightweight mixed-reality headset for immersive computing.",
-    warranty: "Includes 2-year warranty",
-    tags: ["vision pro", "ar headset", "apple xr"],
-    image: "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: 3,
-    title: "Canon EOS R8 Mark II",
-    category: "camera",
-    stock: "20 units ready",
-    price: 1899,
-    originalPrice: 1999,
-    badge: "Featured",
-    rating: 0,
-    shortDesc: "High-performance mirrorless camera with 8K video capture.",
-    warranty: "Includes 2-year warranty",
-    tags: ["canon r8", "mirrorless camera", "8k"],
-    image: "https://images.unsplash.com/photo-1519183071298-a2962be90b8e?auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: 4,
-    title: "Dell XPS 16 (2025)",
-    category: "laptop",
-    stock: "In stock",
-    price: 2199,
-    originalPrice: 2299,
-    badge: "New",
-    rating: 0,
-    shortDesc: "Ultra-premium laptop with next-gen Intel Core processors.",
-    warranty: "Includes 2-year warranty",
-    tags: ["xps 16", "creator laptop"],
-    image: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: 5,
-    title: "Google Pixel 9 Pro XL",
-    category: "mobile",
-    stock: "28 units ready",
-    price: 1299,
-    badge: "New",
-    rating: 0,
-    shortDesc: "AI-powered flagship with upgraded Tensor G4 chip.",
-    warranty: "Includes 2-year warranty",
-    tags: ["pixel 9", "android"],
-    image: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: 6,
-    title: "iPad Air M2 11\"",
-    category: "tablet",
-    stock: "22 units ready",
-    price: 1099,
-    badge: "Featured",
-    rating: 0,
-    shortDesc: "Lightweight tablet with Apple Pencil Pro support.",
-    warranty: "Includes 2-year warranty",
-    tags: ["ipad air", "tablet", "apple pencil"],
-    image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80",
-  },
-];
-
 export default function Products() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [activePrice, setActivePrice] = useState("any");
@@ -120,15 +37,74 @@ export default function Products() {
   const [sort, setSort] = useState("Featured");
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [quickProduct, setQuickProduct] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const pageSize = 9;
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [categories, setCategories] = useState([staticAllCategory, ...staticDefaults]);
+
+  const mapProduct = (p) => ({
+    id: p._id,
+    slug: p.slug,
+    title: p.name,
+    category: p.category?.slug || p.category?.name?.toLowerCase() || "uncategorized",
+    stock: `${p.stock ?? 0} in stock`,
+    price: Number(p.currentPrice || 0),
+    originalPrice: p.originalPrice ? Number(p.originalPrice) : null,
+    badge: p.isFeatured ? "Featured" : p.isPromoted ? "Promoted" : "",
+    rating: Number(p.averageRating || 0),
+    shortDesc: p.shortDescription || "",
+    tags: p.tags || [],
+    image: p.images?.[0]?.url,
+    warranty: p.promotionEndDate
+      ? `Promo ends ${new Date(p.promotionEndDate).toLocaleDateString()}`
+      : "Includes warranty",
+  });
+
+  const fetchProducts = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const params = { status: "Published", limit: pageSize, page };
+      if (activeCategory !== "all") params.category = activeCategory;
+      const res = await fetchPublishedProducts(params);
+      const list = res.data?.products || [];
+      setProducts(list.map(mapProduct));
+      setTotal(res.data?.total || list.length);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to load products");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCats = async () => {
+    try {
+      const res = await fetchCategories({ status: "Active", limit: 50 });
+      const cats = (res.data?.categories || []).map((c) => ({
+        label: c.name,
+        value: c.slug || c.name.toLowerCase(),
+        desc: c.description || "",
+        id: c._id,
+      }));
+      const merged = [staticAllCategory, ...(cats.length ? cats : staticDefaults)];
+      setCategories(merged);
+    } catch (_err) {
+      // fallback to static categories on error
+      setCategories([staticAllCategory, ...staticDefaults]);
+    }
+  };
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
       const catOk = activeCategory === "all" || p.category === activeCategory;
-      const priceOk = true; // placeholder
+      const priceOk = true; // placeholder for future price filtering
       const ratingOk = activeRating ? p.rating >= activeRating : true;
       return catOk && priceOk && ratingOk;
     });
-  }, [activeCategory, activePrice, activeRating]);
+  }, [activeCategory, activePrice, activeRating, products]);
 
   const selectedChips = useMemo(() => {
     const chips = [];
@@ -146,7 +122,7 @@ export default function Products() {
   const related = useMemo(() => {
     if (!quickProduct) return [];
     return products.filter((p) => p.id !== quickProduct.id).slice(0, 3);
-  }, [quickProduct]);
+  }, [quickProduct, products]);
 
   const clearChip = (chip) => {
     if (chip.type === "category") setActiveCategory("all");
@@ -176,6 +152,14 @@ export default function Products() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    fetchCats();
+  }, []);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [page, activeCategory]);
 
   return (
     <>
@@ -251,46 +235,50 @@ export default function Products() {
                   </div>
                 </div>
 
-                <div className="text-sm text-slate-600">
-                  Showing <span className="font-semibold">{filtered.length}</span> products
-                </div>
-              </div>
-
-              <ProductList products={filtered} onQuickView={(p) => setQuickProduct(p)} view={view} />
-
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-8 pt-4 border-t border-slate-100">
-                <div className="text-sm text-slate-600">Page 1 of 3</div>
-                <div className="flex items-center gap-2">
-                  <button className="px-4 h-10 rounded-full border border-slate-200 text-slate-500 bg-white">
-                    Prev
-                  </button>
-                  {[1, 2, 3].map((page) => (
+                <div className="text-sm text-slate-600 flex items-center justify-between">
+                  <span>
+                    Showing <span className="font-semibold">{filtered.length}</span> of {total || filtered.length} products
+                  </span>
+                  <div className="flex items-center gap-2">
                     <button
-                      key={page}
-                      className={`w-10 h-10 rounded-full border ${
-                        page === 1
-                          ? "bg-primary text-white border-primary"
-                          : "border-slate-200 text-slate-600 hover:border-primary"
-                      }`}
+                      disabled={page <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      className="h-9 px-3 rounded-full border border-slate-200 text-sm font-semibold text-slate-700 disabled:opacity-40 hover:border-primary hover:text-primary transition"
                     >
-                      {page}
+                      Prev
                     </button>
-                  ))}
-                  <button className="px-4 h-10 rounded-full border border-slate-200 text-slate-600 bg-white">
-                    Next
-                  </button>
+                    <div className="px-3 py-1 rounded-full border border-slate-200 text-slate-700 text-sm">
+                      {page}
+                    </div>
+                    <button
+                      disabled={page * pageSize >= total}
+                      onClick={() => setPage((p) => p + 1)}
+                      className="h-9 px-3 rounded-full border border-slate-200 text-sm font-semibold text-slate-700 disabled:opacity-40 hover:border-primary hover:text-primary transition"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               </div>
+
+              {error ? (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 text-rose-700 px-3 py-2 text-sm">
+                  {error}
+                </div>
+              ) : null}
+              {loading ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-center text-slate-500">
+                  Loading products...
+                </div>
+              ) : (
+                <ProductList products={filtered} onQuickView={(p) => setQuickProduct(p)} view={view} />
+              )}
             </div>
           </main>
         </div>
       </div>
 
-      <QuickViewModal
-        product={quickProduct}
-        related={related}
-        onClose={() => setQuickProduct(null)}
-      />
+      <QuickViewModal product={quickProduct} related={related} onClose={() => setQuickProduct(null)} />
     </>
   );
 }

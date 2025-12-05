@@ -1,9 +1,11 @@
 import ProductCard from "./ProductCard";
 import { useCart } from "../../../context/useCart.jsx";
-import { Eye, ShoppingCart } from "lucide-react";
+import { Eye, ShoppingCart, Heart } from "lucide-react";
+import { useWishlist } from "../../../context/useWishlist";
 
 export default function ProductList({ products, onQuickView, view }) {
   const { items = [], addItem, setQuantity } = useCart();
+  const { items: wishItems = [], addItem: addWish, removeItem: removeWish } = useWishlist() || {};
 
   const renderQtyControls = (product) => {
     const cartItem = items.find((i) => i.id === product.id);
@@ -89,6 +91,24 @@ export default function ProductList({ products, onQuickView, view }) {
                   )}
                 </div>
                 <div className="flex items-center gap-3">
+                  <button
+                    className={`w-11 h-11 rounded-full border ${
+                      wishItems.some((w) => w.id === product.id || w.productId === product.id)
+                        ? "border-primary text-primary bg-primary/10"
+                        : "border-slate-200 text-slate-600 hover:border-primary hover:text-primary"
+                    } inline-flex items-center justify-center transition`}
+                    onClick={() => {
+                      const inWish = wishItems.some((w) => w.id === product.id || w.productId === product.id);
+                      if (inWish) {
+                        removeWish && removeWish(product.id);
+                      } else {
+                        addWish && addWish(product.id);
+                      }
+                    }}
+                    title="Wishlist"
+                  >
+                    <Heart size={16} />
+                  </button>
                   <button
                     className="px-5 h-11 rounded-full border border-slate-200 font-semibold text-slate-700 hover:border-primary hover:text-primary transition inline-flex items-center justify-center gap-2 text-sm"
                     onClick={() => onQuickView(product)}

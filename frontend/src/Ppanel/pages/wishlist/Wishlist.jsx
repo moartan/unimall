@@ -1,46 +1,15 @@
-import { Heart, ShoppingCart } from "lucide-react";
-import { useWishlist } from "../../context/useWishlist";
-import { useCart } from "../../context/useCart.jsx";
+import { Heart, ShoppingCart, Trash } from "lucide-react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useWishlist } from "../../context/useWishlist";
+import { useCart } from "../../context/useCart.jsx";
 import { usePpanel } from "../../context/PpanelProvider.jsx";
-
-const mockWishlist = [
-  {
-    id: "w1",
-    title: "Google Pixel 9 Pro XL",
-    category: "mobile",
-    price: 1299,
-    originalPrice: 1399,
-    badge: "New",
-    image: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: "w2",
-    title: "iPad Air M2 11\"",
-    category: "tablet",
-    price: 949,
-    originalPrice: 999,
-    badge: "Featured",
-    image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80",
-  },
-  {
-    id: "w3",
-    title: "Sony A6700 Creator Bundle",
-    category: "camera",
-    price: 1699,
-    originalPrice: 1799,
-    badge: "Featured",
-    image: "https://images.unsplash.com/photo-1519183071298-a2962be90b8e?auto=format&fit=crop&w=800&q=80",
-  },
-];
 
 export default function Wishlist() {
   const { user } = usePpanel();
   const navigate = useNavigate();
-  const { items = [] } = useWishlist() || {};
+  const { items = [], removeItem, loading, error, refetch } = useWishlist() || {};
   const { addItem } = useCart() || {};
-  const displayItems = items.length ? items : mockWishlist;
 
   useEffect(() => {
     if (!user) {
@@ -56,13 +25,24 @@ export default function Wishlist() {
           <p className="text-slate-600">Save items you love and add them to cart when ready.</p>
         </div>
         <div className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-primary/10 text-primary">
-          <Heart size={18} /> {displayItems.length} item{displayItems.length === 1 ? "" : "s"}
+          <Heart size={18} /> {items.length} item{items.length === 1 ? "" : "s"}
         </div>
       </div>
 
+      {error ? (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 text-rose-700 px-3 py-2 text-sm">
+          {error}
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-        {displayItems.length ? (
-          displayItems.map((item) => (
+        {loading ? (
+          <div className="col-span-full bg-white rounded-3xl border border-slate-200 shadow-sm p-8 text-center text-slate-500">
+            Loading wishlist...
+          </div>
+        ) : null}
+        {!loading && items.length ? (
+          items.map((item) => (
             <div
               key={item.id || item.productId}
               className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden hover:shadow-md transition"
@@ -97,12 +77,21 @@ export default function Wishlist() {
                     </span>
                   )}
                 </div>
-                <button
-                  onClick={() => addItem && addItem(item, 1)}
-                  className="w-full h-10 rounded-full bg-primary text-white font-semibold hover:bg-primary-hover transition inline-flex items-center justify-center gap-2 text-sm"
-                >
-                  <ShoppingCart size={16} /> Add to cart
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => addItem && addItem(item, 1)}
+                    className="flex-1 h-10 rounded-full bg-primary text-white font-semibold hover:bg-primary-hover transition inline-flex items-center justify-center gap-2 text-sm"
+                  >
+                    <ShoppingCart size={16} /> Add to cart
+                  </button>
+                  <button
+                    onClick={() => removeItem && removeItem(item.id || item.productId)}
+                    className="w-10 h-10 rounded-full border border-rose-200 text-rose-600 hover:bg-rose-50 transition flex items-center justify-center"
+                    title="Remove from wishlist"
+                  >
+                    <Trash size={16} />
+                  </button>
+                </div>
               </div>
             </div>
           ))

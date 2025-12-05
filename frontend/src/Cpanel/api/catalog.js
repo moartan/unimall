@@ -1,0 +1,44 @@
+import { API_BASE_URL } from '../../shared/api/client';
+
+// Thin helpers around the authenticated Cpanel axios instance.
+export const getProducts = (api, params = {}) =>
+  api.get('/employee/products', { params });
+
+export const getProduct = (api, idOrSlug) =>
+  api.get(`/employee/products/${idOrSlug}`);
+
+export const createProduct = (api, payload) =>
+  api.post('/employee/products', payload);
+
+export const updateProduct = (api, idOrSlug, payload) =>
+  api.put(`/employee/products/${idOrSlug}`, payload);
+
+export const deleteProduct = (api, idOrSlug) =>
+  api.delete(`/employee/products/${idOrSlug}`);
+
+export const getCategories = (api, params = {}) =>
+  api.get('/employee/categories', { params });
+
+export const getCategory = (api, id) =>
+  api.get(`/employee/categories/${id}`);
+
+export const createCategory = (api, payload) =>
+  api.post('/employee/categories', payload);
+
+export const updateCategory = (api, id, payload) =>
+  api.put(`/employee/categories/${id}`, payload);
+
+export const deleteCategory = (api, id) =>
+  api.delete(`/employee/categories/${id}`);
+
+export const uploadProductImages = (api, files = []) => {
+  const formData = new FormData();
+  files.forEach((file) => formData.append('images', file));
+  return api.post('/employee/media/products', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+
+// Convenience for public search paths if needed elsewhere.
+export const getPublicProductSearchUrl = (query, limit = 6) =>
+  `${API_BASE_URL}/catalog/products?q=${encodeURIComponent(query)}&limit=${limit}`;

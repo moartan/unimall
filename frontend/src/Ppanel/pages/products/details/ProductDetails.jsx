@@ -1,89 +1,93 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Star, ShoppingCart, Heart, ArrowLeft, Check } from "lucide-react";
 import ProductList from "../components/ProductList.jsx";
 import QuickViewModal from "../components/QuickViewModal.jsx";
 import { useCart } from "../../../context/useCart.jsx";
+import { useWishlist } from "../../../context/useWishlist";
+import { fetchProductDetail, fetchPublishedProducts } from "../../../api/catalog";
 
-const mockCatalog = [
-  {
-    id: "d1",
-    slug: "google-pixel-9-pro-xl",
-    title: "Google Pixel 9 Pro XL",
-    category: "mobile",
-    price: 1299,
-    originalPrice: 1399,
-    rating: 4.4,
-    shortDesc: "AI-powered flagship with upgraded Tensor G4 chip.",
-    warranty: "Includes 2-year warranty",
-    tags: ["pixel 9", "android"],
-    stock: "28 units ready",
-    badge: "Featured",
-    image:
-      "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=1400&q=80",
-    gallery: [
-      "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1481277542470-605612bd2d61?auto=format&fit=crop&w=1200&q=80",
-    ],
-  },
-  {
-    id: "d2",
-    slug: "dell-xps-16-2025",
-    title: "Dell XPS 16 (2025)",
-    category: "laptop",
-    price: 2199,
-    originalPrice: 2299,
-    rating: 4.3,
-    shortDesc: "Ultra-premium laptop with next-gen Intel Core processors.",
-    warranty: "Includes 2-year warranty",
-    tags: ["xps 16", "creator laptop"],
-    stock: "In stock",
-    badge: "New",
-    image:
-      "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1400&q=80",
-    gallery: [
-      "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1481277542470-605612bd2d61?auto=format&fit=crop&w=1200&q=80",
-    ],
-  },
-  {
-    id: "d3",
-    slug: "canon-eos-r8-mark-ii",
-    title: "Canon EOS R8 Mark II",
-    category: "camera",
-    price: 1899,
-    originalPrice: 1999,
-    rating: 4.2,
-    shortDesc: "High-performance mirrorless camera with 8K video capture.",
-    warranty: "Includes 2-year warranty",
-    tags: ["canon r8", "mirrorless camera", "8k"],
-    stock: "20 units ready",
-    badge: "Featured",
-    image:
-      "https://images.unsplash.com/photo-1519183071298-a2962be90b8e?auto=format&fit=crop&w=1400&q=80",
-    gallery: [
-      "https://images.unsplash.com/photo-1519183071298-a2962be90b8e?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1481277542470-605612bd2d61?auto=format&fit=crop&w=1200&q=80",
-    ],
-  },
-];
+const mapProduct = (p) => ({
+  id: p._id,
+  slug: p.slug,
+  title: p.name,
+  category: p.category?.slug || p.category?.name || "uncategorized",
+  categoryId: p.category?._id,
+  stock: `${p.stock ?? 0} in stock`,
+  price: Number(p.currentPrice || 0),
+  originalPrice: p.originalPrice ? Number(p.originalPrice) : null,
+  badge: p.isFeatured ? "Featured" : p.isPromoted ? "Promoted" : "",
+  rating: Number(p.averageRating || 0),
+  reviewCount: Number(p.reviewCount || p.ratingCount || 0),
+  shortDesc: p.shortDescription || "",
+  warranty: p.promotionEndDate
+    ? `Promo ends ${new Date(p.promotionEndDate).toLocaleDateString()}`
+    : "Includes 2-year warranty",
+  tags: p.tags || [],
+  image: p.images?.[0]?.url,
+  gallery: p.images?.map((img) => img.url).filter(Boolean) || [],
+});
 
 export default function ProductDetails() {
   const { slugOrId } = useParams();
   const { addItem, items = [], setQuantity } = useCart();
+  const { items: wishItems = [], addItem: addWish, removeItem: removeWish } = useWishlist() || {};
+  const [product, setProduct] = useState(null);
+  const [related, setRelated] = useState([]);
   const [qty, setQty] = useState(1);
   const [selectedImg, setSelectedImg] = useState(0);
-  const [selectedColor, setSelectedColor] = useState("Blue");
-  const [selectedVariant, setSelectedVariant] = useState("256GB");
-  const product = useMemo(
-    () => mockCatalog.find((p) => p.slug === slugOrId || p.id === slugOrId) || mockCatalog[0],
-    [slugOrId]
-  );
-  const related = mockCatalog.filter((p) => p.id !== product.id).slice(0, 3);
-  const gallery = product.gallery || [];
-  const cartItem = items.find((i) => i.id === product.id);
+  const [selectedColor, setSelectedColor] = useState("Default");
+  const [selectedVariant, setSelectedVariant] = useState("Standard");
+  const [quickProduct, setQuickProduct] = useState(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const cartItem = items.find((i) => i.id === product?.id);
   const displayQty = cartItem?.quantity ?? qty;
+  const inWishlist = product
+    ? wishItems.some((w) => w.id === product.id || w.productId === product.id)
+    : false;
+
+  useEffect(() => {
+    const loadProduct = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await fetchProductDetail(slugOrId);
+        const mapped = mapProduct(res.data?.product || {});
+        setProduct(mapped);
+        setSelectedImg(0);
+        if (mapped.categoryId) {
+          const relatedRes = await fetchPublishedProducts({ category: mapped.categoryId, limit: 4 });
+          const relatedMapped = (relatedRes.data?.products || [])
+            .filter((p) => p._id !== mapped.id)
+            .map(mapProduct)
+            .slice(0, 3);
+          setRelated(relatedMapped);
+        } else {
+          setRelated([]);
+        }
+      } catch (err) {
+        setError(err.response?.data?.message || "Product not found");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadProduct();
+  }, [slugOrId]);
+
+  const gallery = useMemo(() => {
+    if (!product) return [];
+    return [product.image, ...(product.gallery || [])].filter(Boolean).slice(0, 5);
+  }, [product]);
+
+  if (loading) {
+    return <div className="w-full mx-auto px-4 lg:px-20 py-8">Loading product...</div>;
+  }
+
+  if (error || !product) {
+    return <div className="w-full mx-auto px-4 lg:px-20 py-8 text-rose-600">{error || "Product not found"}</div>;
+  }
 
   return (
     <div className="w-full mx-auto px-4 lg:px-20 py-8 bg-[#f8fafc] space-y-8">
@@ -91,20 +95,18 @@ export default function ProductDetails() {
         <div className="space-y-4">
           <div className="aspect-4/3 w-full overflow-hidden rounded-3xl bg-slate-100">
             <img
-              src={gallery[selectedImg] || product.image}
+              src={gallery[selectedImg]}
               alt={product.title}
               className="w-full h-full object-cover"
             />
           </div>
           <div className="grid grid-cols-5 gap-3">
-            {[product.image, ...gallery].slice(0, 5).map((img, idx) => (
+            {gallery.map((img, idx) => (
               <button
                 key={`${img}-${idx}`}
-                onClick={() => setSelectedImg(idx === 0 ? 0 : idx - 1)}
+                onClick={() => setSelectedImg(idx)}
                 className={`aspect-square overflow-hidden rounded-2xl border ${
-                  (idx === 0 ? selectedImg === 0 : selectedImg === idx - 1)
-                    ? "border-primary"
-                    : "border-slate-200"
+                  selectedImg === idx ? "border-primary" : "border-slate-200"
                 } bg-slate-50`}
               >
                 <img src={img} alt={product.title} className="w-full h-full object-cover" />
@@ -131,7 +133,7 @@ export default function ProductDetails() {
           <div className="flex items-center gap-2 text-sm text-amber-500">
             <Star size={14} fill="currentColor" />
             <span className="text-slate-600">{product.rating.toFixed(1)}</span>
-            <span className="text-slate-400">(128 reviews)</span>
+            <span className="text-slate-400">({product.reviewCount || 0} reviews)</span>
           </div>
           <p className="text-slate-700 text-lg leading-relaxed">{product.shortDesc}</p>
           {product.tags?.length ? (
@@ -159,13 +161,13 @@ export default function ProductDetails() {
           <div className="space-y-3 pt-2">
             <OptionGroup
               label="Colour"
-              options={["Green", "Pink", "Silver", "Blue"]}
+              options={["Default", "Black", "Silver", "Blue"]}
               selected={selectedColor}
               onSelect={setSelectedColor}
             />
             <OptionGroup
-              label="SSD capacity"
-              options={["256GB", "512GB", "1TB"]}
+              label="Variant"
+              options={["Standard", "Plus", "Pro"]}
               selected={selectedVariant}
               onSelect={setSelectedVariant}
             />
@@ -201,24 +203,43 @@ export default function ProductDetails() {
               </button>
             )}
 
-            <button className="px-5 h-11 rounded-full border border-slate-200 font-semibold text-slate-700 hover:border-primary hover:text-primary transition inline-flex items-center gap-2">
-              <Heart size={18} /> Save
+            <button
+              className={`w-12 h-12 rounded-full border flex items-center justify-center transition ${
+                inWishlist
+                  ? "border-primary text-primary bg-primary/10"
+                  : "border-slate-200 bg-white text-slate-500 hover:text-primary"
+              }`}
+              onClick={() => {
+                if (inWishlist) {
+                  removeWish && removeWish(product.id);
+                } else {
+                  addWish && addWish(product.id);
+                }
+              }}
+              title={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+            >
+              <Heart size={18} fill={inWishlist ? "currentColor" : "none"} />
             </button>
           </div>
-      </div>
-      </div>
-
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-primary font-semibold">Related products</p>
-            <h2 className="text-2xl font-bold text-slate-900">You might also like</h2>
-          </div>
         </div>
-        <ProductList products={related} onQuickView={() => {}} view="grid" />
       </div>
 
-      <QuickViewModal product={null} related={[]} onClose={() => {}} />
+      <QuickViewModal product={quickProduct} related={related} onClose={() => setQuickProduct(null)} />
+
+      {related?.length ? (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 lg:p-8 space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-bold text-slate-900">You might also like</h3>
+            <button
+              className="inline-flex items-center gap-2 text-primary font-semibold text-sm"
+              onClick={() => setQuickProduct(related[0])}
+            >
+              Quick view one
+            </button>
+          </div>
+          <ProductList products={related} onQuickView={setQuickProduct} view="grid" />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -226,19 +247,18 @@ export default function ProductDetails() {
 function OptionGroup({ label, options, selected, onSelect }) {
   return (
     <div className="space-y-2">
-      <p className="text-sm font-semibold text-slate-800">{label}</p>
+      <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">{label}</p>
       <div className="flex flex-wrap gap-2">
         {options.map((opt) => (
           <button
             key={opt}
             onClick={() => onSelect(opt)}
-            className={`px-3 h-10 rounded-full border text-sm font-semibold ${
+            className={`px-4 h-10 rounded-full border text-sm font-semibold transition ${
               selected === opt
-                ? "border-primary text-primary bg-primary/5"
+                ? "border-primary bg-primary/10 text-primary"
                 : "border-slate-200 text-slate-700 hover:border-primary hover:text-primary"
             }`}
           >
-            {selected === opt && <Check size={14} className="mr-1 inline text-primary" />}
             {opt}
           </button>
         ))}
