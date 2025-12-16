@@ -1,14 +1,14 @@
-import { Heart, ShoppingCart, Star, X } from "lucide-react";
+import { Bookmark, ShoppingCart, Star, X } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function QuickViewModal({ product, related, onClose }) {
   if (!product) return null;
 
   const detailLink = product.slug
-    ? `/products/details/${product.slug}`
+    ? `/collections/view/${product.slug}`
     : product.id
-      ? `/products/details/${product.id}`
-      : "/products";
+      ? `/collections/view/${product.id}`
+      : "/collections";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
@@ -69,13 +69,13 @@ export default function QuickViewModal({ product, related, onClose }) {
                   className="px-5 h-11 rounded-full bg-primary text-white font-semibold hover:bg-primary-hover transition inline-flex items-center justify-center"
                   onClick={onClose}
                 >
-                  View full details
+                  View full item
                 </Link>
                 <button className="px-5 h-11 rounded-full border border-slate-200 font-semibold text-slate-700 hover:border-primary hover:text-primary transition inline-flex items-center gap-2">
                   <ShoppingCart size={18} /> Add to cart
                 </button>
                 <button className="w-11 h-11 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:text-primary">
-                  <Heart size={18} />
+                  <Bookmark size={18} />
                 </button>
               </div>
             </div>

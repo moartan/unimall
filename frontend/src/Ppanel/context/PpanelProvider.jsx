@@ -2,6 +2,19 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { baseClient, createApiClient } from '../../shared/api/client';
 
 const PpanelContext = createContext({});
+const SESSION_FLAG_KEY = 'unimall_customer_session';
+
+const hasSessionFlag = () =>
+  typeof window !== 'undefined' && window.localStorage.getItem(SESSION_FLAG_KEY) === '1';
+
+const setSessionFlag = (value) => {
+  if (typeof window === 'undefined') return;
+  if (value) {
+    window.localStorage.setItem(SESSION_FLAG_KEY, '1');
+  } else {
+    window.localStorage.removeItem(SESSION_FLAG_KEY);
+  }
+};
 
 export default function PpanelProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -29,6 +42,7 @@ export default function PpanelProvider({ children }) {
   );
 
   const refreshSession = useCallback(async () => {
+    if (!hasSessionFlag()) return;
     try {
       if (!csrfRef.current) {
         const csrfRes = await baseClient.get('/csrf-token');
@@ -51,6 +65,7 @@ export default function PpanelProvider({ children }) {
       }
     } catch (err) {
       setToken(null);
+      setSessionFlag(false);
     }
   }, [api, user]);
 
@@ -74,6 +89,10 @@ export default function PpanelProvider({ children }) {
 
     const bootstrap = async () => {
       try {
+        if (!hasSessionFlag()) {
+          setLoading(false);
+          return;
+        }
         if (!csrfRef.current) {
           const csrfRes = await baseClient.get('/csrf-token');
           csrfRef.current = csrfRes.data?.csrfToken;
@@ -96,6 +115,7 @@ export default function PpanelProvider({ children }) {
       } catch (err) {
         setUser(null);
         setToken(null);
+        setSessionFlag(false);
       } finally {
         setLoading(false);
       }
@@ -129,6 +149,7 @@ export default function PpanelProvider({ children }) {
       const { data } = await api.post('/auth/customer/login', { email, password });
       setUser(data.user);
       setToken(data.accessToken);
+      setSessionFlag(true);
       return data.user;
     },
     [api],
@@ -142,6 +163,7 @@ export default function PpanelProvider({ children }) {
     }
     setUser(null);
     setToken(null);
+    setSessionFlag(false);
     if (refreshTimer.current) {
       clearInterval(refreshTimer.current);
     }

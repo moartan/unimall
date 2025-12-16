@@ -89,7 +89,6 @@ app.use('/employee/categories', employeeCategoryRoutes);
 app.use('/employee/products', employeeProductRoutes);
 app.use('/catalog/products', catalogProductRoutes);
 app.use('/catalog/categories', catalogCategoryRoutes);
-app.use('/employee/media', employeeMediaRoutes);
 app.use('/customer/wishlist', customerWishlistRoutes);
 app.use('/customer/cart', customerCartRoutes);
 app.use('/customer/orders', customerOrderRoutes);

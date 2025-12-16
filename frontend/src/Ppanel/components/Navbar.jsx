@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, NavLink } from "react-router-dom";
-import { Heart, ShoppingCart, User, Search, Bell, Clock } from "lucide-react";
+import { Link, NavLink, useLocation } from "react-router-dom";
+import { Bookmark, ShoppingCart, User, Search, Bell, Clock } from "lucide-react";
 import dayjs from "dayjs";
 import { usePpanel } from "../context/PpanelProvider";
 import { useCart } from "../context/useCart.jsx";
@@ -11,16 +11,18 @@ import CartCard from "../pages/cart/CartCard";
 
 const primaryLinks = [
   { label: "Home", to: "/" },
-  { label: "Collections", to: "/products" },
-  { label: "Trending", to: "/products/trending" },
-  { label: "Mobile", to: "/products/mobile" },
-  { label: "Camera", to: "/products/camera" },
-  { label: "Laptop", to: "/products/laptop" },
-  { label: "About", to: "/about" },
+  { label: "Collections", to: "/collections", type: "collection" },
+  { label: "Trending", to: "/collections/trending", type: "featured" },
+  { label: "Latest", to: "/collections/latest", type: "featured" },
+  { label: "Mobile", to: "/collections/mobile", type: "category" },
+  { label: "Camera", to: "/collections/camera", type: "category" },
+  { label: "Laptop", to: "/collections/laptop", type: "category" },
+  { label: "About us", to: "/about" },
   { label: "Contact us", to: "/contact" },
 ];
 
 export default function Navbar() {
+  const location = useLocation();
   const { user, logout, api } = usePpanel();
   const cart = useCart() || {};
   const wishlist = useWishlist() || {};
@@ -145,7 +147,7 @@ export default function Navbar() {
 
             <IconPill
               to="/wishlist"
-              icon={<Heart size={20} />}
+              icon={<Bookmark size={20} />}
               count={wishlistItems.length}
             />
 
@@ -407,21 +409,34 @@ export default function Navbar() {
       {/* MENU BAR */}
       <div className="bg-white border-t border-b border-slate-100">
         <div className="w-full px-4 lg:px-20 py-2 flex items-center gap-6 lg:gap-8 text-sm overflow-x-auto">
-          {primaryLinks.map((link) => (
-            <NavLink
-              key={link.label}
-              to={link.to}
-              className={({ isActive }) =>
-                `relative pb-2 font-semibold transition whitespace-nowrap ${
-                  isActive
+          {primaryLinks.map((link) => {
+            const path = location.pathname;
+            const isExact = path === link.to;
+            const isHome = link.to === "/" && path === "/";
+            const isFeatured = link.type === "featured" && path.startsWith(link.to);
+            const isCategory = link.type === "category" && path === link.to;
+            const isCollections =
+              link.type === "collection" &&
+              path === "/collections";
+            const isAbout = link.to === "/about" && path.startsWith("/about");
+
+            const isActive = isExact || isHome || isFeatured || isCategory || isCollections || isAbout;
+
+            return (
+              <NavLink
+                key={link.label}
+                to={link.to}
+                className={
+                  `relative pb-2 font-semibold transition whitespace-nowrap ` +
+                  (isActive
                     ? "text-primary after:content-[''] after:absolute after:left-0 after:right-0 after:bottom-0 after:h-[3px] after:bg-primary"
-                    : "text-slate-700 hover:text-primary"
-                }`
-              }
-            >
-              {link.label}
-            </NavLink>
-          ))}
+                    : "text-slate-700 hover:text-primary")
+                }
+              >
+                {link.label}
+              </NavLink>
+            );
+          })}
 
           <Link
             to="/support"

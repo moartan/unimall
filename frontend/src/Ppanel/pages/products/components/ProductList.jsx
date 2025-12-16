@@ -1,9 +1,9 @@
 import ProductCard from "./ProductCard";
 import { useCart } from "../../../context/useCart.jsx";
-import { Eye, ShoppingCart, Heart } from "lucide-react";
+import { Eye, ShoppingCart, Bookmark } from "lucide-react";
 import { useWishlist } from "../../../context/useWishlist";
 
-export default function ProductList({ products, onQuickView, view }) {
+export default function ProductList({ products, onQuickView, view, loading }) {
   const { items = [], addItem, setQuantity } = useCart();
   const { items: wishItems = [], addItem: addWish, removeItem: removeWish } = useWishlist() || {};
 
@@ -45,6 +45,63 @@ export default function ProductList({ products, onQuickView, view }) {
       </div>
     );
   };
+
+  if (loading) {
+    const skeletonItems = Array.from({ length: view === "list" ? 3 : 6 });
+    if (view === "list") {
+      return (
+        <div className="space-y-4">
+          {skeletonItems.map((_, idx) => (
+            <div
+              key={idx}
+              className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col lg:flex-row animate-pulse"
+            >
+              <div className="w-full lg:w-64 h-52 bg-slate-100" />
+              <div className="flex-1 p-4 lg:p-5 space-y-3">
+                <div className="h-3 w-32 bg-slate-100 rounded-full" />
+                <div className="h-5 w-52 bg-slate-100 rounded-full" />
+                <div className="h-4 w-full bg-slate-100 rounded" />
+                <div className="h-4 w-3/4 bg-slate-100 rounded" />
+                <div className="flex items-center gap-3 pt-4">
+                  <div className="h-5 w-16 bg-slate-100 rounded-full" />
+                  <div className="h-5 w-12 bg-slate-100 rounded-full" />
+                  <div className="h-5 w-10 bg-slate-100 rounded-full" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+        {skeletonItems.map((_, idx) => (
+          <div key={idx} className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden animate-pulse">
+            <div className="w-full h-56 bg-slate-100" />
+            <div className="p-4 space-y-3">
+              <div className="h-3 w-24 bg-slate-100 rounded-full" />
+              <div className="h-5 w-3/4 bg-slate-100 rounded" />
+              <div className="h-4 w-full bg-slate-100 rounded" />
+              <div className="flex items-center gap-2 pt-1">
+                <div className="h-6 w-16 bg-slate-100 rounded-full" />
+                <div className="h-6 w-10 bg-slate-100 rounded-full" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (!loading && (!products || !products.length)) {
+    return (
+      <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center text-slate-600">
+        <p className="text-lg font-semibold text-slate-800">No products match your filters.</p>
+        <p className="text-sm text-slate-500 mt-1">Try adjusting categories, featured tabs, or sorting.</p>
+      </div>
+    );
+  }
 
   if (view === "list") {
     return (
@@ -92,11 +149,11 @@ export default function ProductList({ products, onQuickView, view }) {
                 </div>
                 <div className="flex items-center gap-3">
                   <button
-                    className={`w-11 h-11 rounded-full border ${
+                    className={`w-11 h-11 rounded-full border-2 shadow-sm transition ${
                       wishItems.some((w) => w.id === product.id || w.productId === product.id)
-                        ? "border-primary text-primary bg-primary/10"
-                        : "border-slate-200 text-slate-600 hover:border-primary hover:text-primary"
-                    } inline-flex items-center justify-center transition`}
+                        ? "border-primary bg-primary text-white"
+                        : "border-primary text-primary bg-white hover:bg-primary/5"
+                    } inline-flex items-center justify-center`}
                     onClick={() => {
                       const inWish = wishItems.some((w) => w.id === product.id || w.productId === product.id);
                       if (inWish) {
@@ -107,7 +164,7 @@ export default function ProductList({ products, onQuickView, view }) {
                     }}
                     title="Wishlist"
                   >
-                    <Heart size={16} />
+                    <Bookmark size={16} />
                   </button>
                   <button
                     className="px-5 h-11 rounded-full border border-slate-200 font-semibold text-slate-700 hover:border-primary hover:text-primary transition inline-flex items-center justify-center gap-2 text-sm"
@@ -128,7 +185,11 @@ export default function ProductList({ products, onQuickView, view }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
       {products.map((product) => (
-        <ProductCard key={product.id} product={product} onQuickView={onQuickView} view={view} />
+        <ProductCard
+          key={product.id}
+          product={product}
+          onQuickView={onQuickView}
+        />
       ))}
     </div>
   );

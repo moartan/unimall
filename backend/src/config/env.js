@@ -13,6 +13,8 @@ const validateEnv = () => {
 
 validateEnv();
 
+const isProd = process.env.NODE_ENV === 'production';
+
 const config = {
   // Pick a non-conflicting default port; override via PORT env if needed
   port: process.env.PORT || 8081,
@@ -26,9 +28,9 @@ const config = {
   cookies: {
     customerRefreshName: 'customerRefreshToken',
     employeeRefreshName: 'employeeRefreshToken',
-    // In production we must allow cross-site cookies for the frontend domain
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    // For dev (http://localhost) use lax + insecure; for prod use none + secure unless overridden
+    secure: process.env.COOKIES_SECURE === 'true' || isProd,
+    sameSite: process.env.COOKIES_SAMESITE || (isProd ? 'none' : 'lax'),
   },
   email: {
     host: process.env.SMTP_HOST,

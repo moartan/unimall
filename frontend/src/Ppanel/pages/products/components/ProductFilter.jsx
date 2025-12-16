@@ -43,7 +43,9 @@ export default function ProductFilter({
                     key={cat.value}
                     onClick={() => setActiveCategory(cat.value)}
                     className={`w-full text-left p-3 rounded-2xl border text-sm transition ${
-                      activeCategory === cat.value
+                      (Array.isArray(activeCategory)
+                        ? activeCategory.includes(cat.value)
+                        : activeCategory === cat.value)
                         ? "border-primary text-primary bg-primary/5"
                         : "border-slate-200 text-slate-700 hover:border-primary/40"
                     }`}

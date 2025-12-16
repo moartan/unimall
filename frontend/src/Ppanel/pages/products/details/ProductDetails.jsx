@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Star, ShoppingCart, Heart, ArrowLeft, Check } from "lucide-react";
+import { Star, ShoppingCart, Bookmark, ArrowLeft, Check } from "lucide-react";
 import ProductList from "../components/ProductList.jsx";
 import QuickViewModal from "../components/QuickViewModal.jsx";
 import { useCart } from "../../../context/useCart.jsx";
 import { useWishlist } from "../../../context/useWishlist";
 import { fetchProductDetail, fetchPublishedProducts } from "../../../api/catalog";
+import useCanonical from "../../../../shared/seo/useCanonical.js";
 
 const mapProduct = (p) => ({
   id: p._id,
@@ -48,6 +49,8 @@ export default function ProductDetails() {
     ? wishItems.some((w) => w.id === product.id || w.productId === product.id)
     : false;
 
+  useCanonical(`/collections/view/${slugOrId}`);
+
   useEffect(() => {
     const loadProduct = async () => {
       setLoading(true);
@@ -56,6 +59,24 @@ export default function ProductDetails() {
         const res = await fetchProductDetail(slugOrId);
         const mapped = mapProduct(res.data?.product || {});
         setProduct(mapped);
+        // Record recently viewed
+        try {
+          const key = "recent_products";
+          const existing = JSON.parse(localStorage.getItem(key) || "[]");
+          const filtered = existing.filter((item) => item.id !== mapped.id);
+          const entry = {
+            id: mapped.id,
+            slug: mapped.slug || mapped.id,
+            title: mapped.title,
+            image: mapped.image || mapped.gallery?.[0] || "",
+            price: mapped.price,
+            category: mapped.category,
+          };
+          const updated = [entry, ...filtered].slice(0, 10);
+          localStorage.setItem(key, JSON.stringify(updated));
+        } catch (_err) {
+          // ignore storage errors
+        }
         setSelectedImg(0);
         if (mapped.categoryId) {
           const relatedRes = await fetchPublishedProducts({ category: mapped.categoryId, limit: 4 });
@@ -123,7 +144,7 @@ export default function ProductDetails() {
               <span>{product.stock}</span>
             </div>
             <Link
-              to="/products"
+              to="/collections"
               className="inline-flex items-center gap-2 text-primary font-semibold text-sm"
             >
               Back to collections <ArrowLeft size={16} />
@@ -218,7 +239,7 @@ export default function ProductDetails() {
               }}
               title={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
             >
-              <Heart size={18} fill={inWishlist ? "currentColor" : "none"} />
+              <Bookmark size={18} fill={inWishlist ? "currentColor" : "none"} />
             </button>
           </div>
         </div>

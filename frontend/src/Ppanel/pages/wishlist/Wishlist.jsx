@@ -1,4 +1,4 @@
-import { Heart, ShoppingCart, Trash } from "lucide-react";
+import { Bookmark, ShoppingCart, Trash } from "lucide-react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useWishlist } from "../../context/useWishlist";
@@ -25,7 +25,7 @@ export default function Wishlist() {
           <p className="text-slate-600">Save items you love and add them to cart when ready.</p>
         </div>
         <div className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-primary/10 text-primary">
-          <Heart size={18} /> {items.length} item{items.length === 1 ? "" : "s"}
+          <Bookmark size={18} /> {items.length} item{items.length === 1 ? "" : "s"}
         </div>
       </div>
 

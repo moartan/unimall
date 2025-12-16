@@ -15,10 +15,31 @@ const parsePagination = (req) => {
 const buildFilters = (req, resolvedCategoryId = null) => {
   const filter = { isDeleted: { $ne: true } };
   if (req.query.status) filter.status = req.query.status;
-  if (resolvedCategoryId) filter.category = resolvedCategoryId;
-  else if (req.query.category) filter.category = req.query.category;
+  if (Array.isArray(resolvedCategoryId) && resolvedCategoryId.length) {
+    filter.category = { $in: resolvedCategoryId };
+  } else if (resolvedCategoryId) {
+    filter.category = resolvedCategoryId;
+  } else if (req.query.category) {
+    const cat = Array.isArray(req.query.category)
+      ? req.query.category
+      : String(req.query.category).split(',').map((c) => c.trim()).filter(Boolean);
+    if (cat.length === 1) {
+      filter.category = cat[0];
+    } else if (cat.length > 1) {
+      filter.category = { $in: cat };
+    }
+  }
   if (req.query.q) {
     filter.$text = { $search: req.query.q };
+  }
+  if (req.query.search) {
+    const regex = new RegExp(req.query.search, 'i');
+    filter.$or = [
+      { name: regex },
+      { shortDescription: regex },
+      { slug: regex },
+      { tags: regex },
+    ];
   }
   if (req.query.minPrice || req.query.maxPrice) {
     filter.currentPrice = {};
@@ -150,17 +171,28 @@ export const listProducts = async (req, res, next) => {
 export const listPublishedProducts = async (req, res, next) => {
   try {
     const { page, limit, skip } = parsePagination(req);
-    let categoryId = null;
+    let resolvedCategoryIds = [];
     if (req.query.category) {
-      if (mongoose.Types.ObjectId.isValid(req.query.category)) {
-        categoryId = req.query.category;
-      } else {
-        const cat = await Category.findOne({ slug: req.query.category, isDeleted: { $ne: true } });
-        if (cat) categoryId = cat._id;
-        else return res.json({ products: [], page, limit, total: 0 });
+      const raw = Array.isArray(req.query.category)
+        ? req.query.category
+        : String(req.query.category).split(',').map((c) => c.trim()).filter(Boolean);
+      const objectIds = raw.filter((c) => mongoose.Types.ObjectId.isValid(c));
+      const slugCandidates = raw.filter((c) => !mongoose.Types.ObjectId.isValid(c));
+
+      if (slugCandidates.length) {
+        const found = await Category.find({
+          slug: { $in: slugCandidates },
+          isDeleted: { $ne: true },
+        }).select('_id');
+        resolvedCategoryIds.push(...found.map((c) => c._id.toString()));
+      }
+      resolvedCategoryIds.push(...objectIds);
+      // If none resolved, short-circuit to empty result
+      if (!resolvedCategoryIds.length) {
+        return res.json({ products: [], page, limit, total: 0 });
       }
     }
-    const filter = buildFilters(req, categoryId);
+    const filter = buildFilters(req, resolvedCategoryIds.length ? resolvedCategoryIds : null);
     filter.status = 'Published';
 
     if (req.query.minPrice || req.query.maxPrice) {

@@ -1,4 +1,4 @@
-import { Heart, ShoppingCart, Eye, Star } from "lucide-react";
+import { Bookmark, ShoppingCart, Eye, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useCart } from "../../../context/useCart.jsx";
 import { useWishlist } from "../../../context/useWishlist";
@@ -50,7 +50,7 @@ export default function ProductCard({ product, onQuickView }) {
           }}
           title={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
         >
-          <Heart size={18} fill={inWishlist ? "currentColor" : "none"} />
+          <Bookmark size={18} fill={inWishlist ? "currentColor" : "none"} />
         </button>
       </div>
 
@@ -63,10 +63,10 @@ export default function ProductCard({ product, onQuickView }) {
         <Link
           to={
             product.slug
-              ? `/products/details/${product.slug}`
+              ? `/collections/view/${product.slug}`
               : product.id
-                ? `/products/details/${product.id}`
-                : "/products"
+                ? `/collections/view/${product.id}`
+                : "/collections"
           }
           className="text-lg font-semibold text-slate-900 hover:text-primary"
         >
@@ -78,7 +78,7 @@ export default function ProductCard({ product, onQuickView }) {
           <span className="text-slate-400">(0 reviews)</span>
         </div>
         <p className="text-sm text-slate-600">
-          {product.shortDesc || "Discover more in details."}
+          {product.shortDesc || "Discover more inside."}
         </p>
         {product.tags?.length ? (
           <div className="flex flex-wrap gap-2">
