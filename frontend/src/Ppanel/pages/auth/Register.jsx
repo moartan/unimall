@@ -5,12 +5,13 @@ import { usePpanel } from '../../context/PpanelProvider.jsx';
 
 export default function Register() {
   const navigate = useNavigate();
-  const { api, setUser, setToken, user, loading: authLoading } = usePpanel();
+  const { api, setUser, setToken, user, loading: authLoading, ensureCsrf } = usePpanel();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -26,6 +27,7 @@ export default function Register() {
       return;
     }
     setError('');
+    setSuccess('');
     setSubmitting(true);
     try {
       const { data } = await api.post('/auth/customer/register', {
@@ -34,8 +36,10 @@ export default function Register() {
         password,
       });
       if (data?.user && data?.accessToken) {
+        await ensureCsrf();
         setUser(data.user);
         setToken(data.accessToken);
+        setSuccess('Account created! Redirecting...');
         navigate('/', { replace: true });
       } else {
         navigate('/login');
@@ -68,6 +72,11 @@ export default function Register() {
         {error ? (
           <div className="mb-3 text-red-600 bg-red-100 dark:bg-red-900/40 rounded p-2 text-sm text-center">
             {error}
+          </div>
+        ) : null}
+        {success ? (
+          <div className="mb-3 text-green-600 bg-green-100 dark:bg-green-900/40 rounded p-2 text-sm text-center">
+            {success}
           </div>
         ) : null}
 

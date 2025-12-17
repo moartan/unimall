@@ -1,14 +1,14 @@
-<svg width="240" height="240" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="paint0_linear" x1="70" y1="20" x2="170" y2="210" gradientUnits="userSpaceOnUse">
+    <linearGradient id="faviconBlue" x1="62" y1="28" x2="162" y2="228" gradientUnits="userSpaceOnUse">
       <stop stop-color="#0C5BA8"/>
-      <stop offset="1" stop-color="#00AFA1"/>
+      <stop offset="1" stop-color="#0B4D96"/>
     </linearGradient>
-    <linearGradient id="paint1_linear" x1="130" y1="20" x2="190" y2="140" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#0A5AA5"/>
-      <stop offset="1" stop-color="#00B2A5"/>
+    <linearGradient id="faviconTeal" x1="140" y1="90" x2="200" y2="210" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00AFA1"/>
+      <stop offset="1" stop-color="#00947E"/>
     </linearGradient>
   </defs>
-  <path d="M78 22C58.67 22 43 37.67 43 57v90c0 39.7 32.3 72 72 72h10c39.7 0 72-32.3 72-72V84h-34v64.5c0 18.5-15 33.5-33.5 33.5h-6c-18.5 0-33.5-15-33.5-33.5V57C90 37.67 74.33 22 55 22H78Z" fill="url(#paint0_linear)"/>
-  <path d="M132 26l60 60h-34v48h-26V86h-32l32-60Z" fill="url(#paint1_linear)"/>
+  <path d="M74 36c-11 0-20 9-20 20v116c0 32.5 26.5 59 59 59h10c32.5 0 59-26.5 59-59V98h-28v74c0 16.6-13.4 30-30 30h-6c-16.6 0-30-13.4-30-30V56c0-11-9-20-20-20H74Z" fill="url(#faviconBlue)"/>
+  <path d="M144 40l60 60h-34v72h-26v-60h-28l28-72Z" fill="url(#faviconTeal)"/>
 </svg>

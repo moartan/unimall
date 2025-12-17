@@ -1,22 +1,30 @@
 import nodemailer from 'nodemailer';
 import config from '../config/env.js';
 
-const transporter = nodemailer.createTransport({
-  host: config.email.host,
-  port: config.email.port,
-  secure: Number(config.email.port) === 465,
-  auth: {
-    user: config.email.user,
-    pass: config.email.pass,
-  },
-});
+let transporter;
 
-export const sendEmail = async ({ to, subject, html }) => {
-  if (!config.email.user || !config.email.pass) {
-    throw new Error('Email credentials are not configured');
+// Lazily build transporter so we can validate envs at send time and reuse the instance.
+const getTransporter = () => {
+  if (transporter) return transporter;
+  const { host, port, user, pass } = config.email;
+  if (!host || !port || !user || !pass) {
+    throw new Error('Email transport is not fully configured (missing host/port/user/pass)');
   }
-  return transporter.sendMail({
-    from: config.email.from,
+  transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: Number(port) === 465,
+    auth: { user, pass },
+  });
+  return transporter;
+};
+
+export const sendEmail = async ({ to, subject, html, from }) => {
+  if (!to) throw new Error('Email recipient is required');
+  const mailer = getTransporter();
+  const fromAddress = from || config.email.from || config.email.user;
+  return mailer.sendMail({
+    from: fromAddress,
     to,
     subject,
     html,

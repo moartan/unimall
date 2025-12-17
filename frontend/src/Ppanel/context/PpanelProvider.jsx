@@ -29,6 +29,7 @@ export default function PpanelProvider({ children }) {
   const setToken = (token) => {
     tokenRef.current = token;
     setAccessToken(token || null);
+    setSessionFlag(Boolean(token));
   };
 
   const api = useMemo(
@@ -41,17 +42,21 @@ export default function PpanelProvider({ children }) {
     [],
   );
 
+  const ensureCsrf = useCallback(async () => {
+    if (csrfRef.current) return csrfRef.current;
+    const csrfRes = await baseClient.get('/csrf-token');
+    csrfRef.current = csrfRes.data?.csrfToken;
+    if (csrfRef.current) {
+      api.defaults.headers.common['X-CSRF-Token'] = csrfRef.current;
+      baseClient.defaults.headers.common['X-CSRF-Token'] = csrfRef.current;
+    }
+    return csrfRef.current;
+  }, [api]);
+
   const refreshSession = useCallback(async () => {
     if (!hasSessionFlag()) return;
     try {
-      if (!csrfRef.current) {
-        const csrfRes = await baseClient.get('/csrf-token');
-        csrfRef.current = csrfRes.data?.csrfToken;
-        if (csrfRef.current) {
-          api.defaults.headers.common['X-CSRF-Token'] = csrfRef.current;
-          baseClient.defaults.headers.common['X-CSRF-Token'] = csrfRef.current;
-        }
-      }
+      await ensureCsrf();
       const refreshRes = await baseClient.post('/auth/customer/refresh', {});
       const token = refreshRes.data?.accessToken;
       if (token) {
@@ -93,14 +98,7 @@ export default function PpanelProvider({ children }) {
           setLoading(false);
           return;
         }
-        if (!csrfRef.current) {
-          const csrfRes = await baseClient.get('/csrf-token');
-          csrfRef.current = csrfRes.data?.csrfToken;
-          if (csrfRef.current) {
-            api.defaults.headers.common['X-CSRF-Token'] = csrfRes.data?.csrfToken;
-            baseClient.defaults.headers.common['X-CSRF-Token'] = csrfRes.data?.csrfToken;
-          }
-        }
+        await ensureCsrf();
         const refreshRes = await withTimeout(baseClient.post('/auth/customer/refresh', {}));
         const token = refreshRes.data?.accessToken;
         if (token) {
@@ -138,21 +136,14 @@ export default function PpanelProvider({ children }) {
 
   const login = useCallback(
     async (email, password) => {
-      if (!csrfRef.current) {
-        const csrfRes = await baseClient.get('/csrf-token');
-        csrfRef.current = csrfRes.data?.csrfToken;
-        if (csrfRef.current) {
-          api.defaults.headers.common['X-CSRF-Token'] = csrfRef.current;
-          baseClient.defaults.headers.common['X-CSRF-Token'] = csrfRef.current;
-        }
-      }
+      await ensureCsrf();
       const { data } = await api.post('/auth/customer/login', { email, password });
       setUser(data.user);
       setToken(data.accessToken);
       setSessionFlag(true);
       return data.user;
     },
-    [api],
+    [api, ensureCsrf],
   );
 
   const logout = useCallback(async () => {
@@ -179,8 +170,9 @@ export default function PpanelProvider({ children }) {
       logout,
       api,
       setToken,
+      ensureCsrf,
     }),
-    [user, accessToken, loading, login, logout, api, setToken],
+    [user, accessToken, loading, login, logout, api, setToken, ensureCsrf],
   );
 
   return <PpanelContext.Provider value={value}>{children}</PpanelContext.Provider>;

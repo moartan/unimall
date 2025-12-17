@@ -1,16 +1,33 @@
-import { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useContext, useMemo, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CpanelContext } from '../../context/CpanelProvider';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useContext(CpanelContext);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const redirectPath = useMemo(() => {
+    const fromState = location.state?.from;
+    if (typeof fromState === 'string') return fromState === '/cpanel/login' ? '/cpanel/dashboard' : fromState;
+    if (fromState?.pathname && fromState.pathname !== '/cpanel/login') {
+      const search = fromState.search || '';
+      const hash = fromState.hash || '';
+      return `${fromState.pathname}${search}${hash}`;
+    }
+    return '/cpanel/dashboard';
+  }, [location.state]);
+
+  useEffect(() => {
+    // If already logged in and redirected here, bounce to target
+    if (location.state?.skipAutoNav) return;
+  }, [location.state]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -21,7 +38,7 @@ export default function Login() {
       if (login) {
         await login(email, password);
       }
-      navigate('/cpanel/dashboard');
+      navigate(redirectPath, { replace: true });
     } catch (err) {
       const message =
         err?.response?.data?.message ||

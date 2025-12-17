@@ -70,7 +70,7 @@ export default function Header({ onMenuClick }) {
 
   const markAllRead = async () => {
     try {
-      await user?.api?.post?.('/employee/notifications/read-all');
+      await api.post('/employee/notifications/read-all');
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     } catch (err) {
       // ignore

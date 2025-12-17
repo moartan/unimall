@@ -1,4 +1,4 @@
-import { useContext, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { IoIosArrowDropleftCircle, IoIosArrowDown } from 'react-icons/io';
@@ -20,10 +20,10 @@ import {
   FaBullhorn,
 } from 'react-icons/fa';
 import logo from '../../assets/logoSmall.png';
-import { CpanelContext } from '../context/CpanelProvider';
+import { useCpanelUi } from '../context/CpanelUiProvider';
 
 export default function Sidebar() {
-  const { sidebar, handleSidebar } = useContext(CpanelContext);
+  const { sidebar, handleSidebar } = useCpanelUi();
   const { pathname } = useLocation();
   const [hovered, setHovered] = useState(false);
   const [openMenus, setOpenMenus] = useState({
@@ -32,7 +32,8 @@ export default function Sidebar() {
     employees: false,
   });
 
-  const isProductsActive = pathname.startsWith('/cpanel/products');
+  const isViewProductsActive = pathname.startsWith('/cpanel/products/view');
+  const isProductsActive = pathname.startsWith('/cpanel/products') && !isViewProductsActive;
   const isCategoriesActive = pathname.startsWith('/cpanel/categories');
   const isEmployeesActive = pathname.startsWith('/cpanel/employees');
 
@@ -184,15 +185,14 @@ export default function Sidebar() {
               <NavLink to="/cpanel/products/list" className={subLinkClass}>
                 <FaList className="text-[13px]" /> Product Table
               </NavLink>
-              <NavLink to="/cpanel/products/grid" className={subLinkClass}>
-                <FaThLarge className="text-[13px]" /> Grid View
-              </NavLink>
-              <NavLink to="/cpanel/products/customer-list" className={subLinkClass}>
-                <FaListAlt className="text-[13px]" /> List View
-              </NavLink>
             </motion.div>
           )}
         </AnimatePresence>
+
+        <NavLink to="/cpanel/products/view" className={mainLinkClass}>
+          <FaThLarge className="text-lg" />
+          {textVisible && <span>View Products</span>}
+        </NavLink>
 
         <button onClick={() => toggleMenu('categories')} className={parentClass(isCategoriesActive)}>
           <div className="flex items-center gap-3">

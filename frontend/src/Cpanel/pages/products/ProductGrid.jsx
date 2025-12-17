@@ -10,12 +10,22 @@ const statusClass = (status) =>
     ? 'bg-emerald-100 text-emerald-700'
     : 'bg-amber-100 text-amber-700';
 
-export default function ProductGrid() {
+export default function ProductGrid({
+  hideHeading = false,
+  controlledPage,
+  onPageChange,
+  hidePagination = false,
+  sort = '-createdAt',
+  onMeta,
+  inlinePager = false,
+  extraFilters = {},
+}) {
   const { api, user } = useCpanel();
+  const isControlled = typeof controlledPage === 'number';
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('Published');
   const [category, setCategory] = useState('all');
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(controlledPage ?? 1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -24,6 +34,16 @@ export default function ProductGrid() {
   const [deletingId, setDeletingId] = useState(null);
   const pageSize = 9;
   const isAdmin = user?.employeeRole === 'admin';
+
+  const pageToUse = controlledPage ?? page;
+  const updatePage = (next) => {
+    onPageChange?.(next);
+    if (!isControlled) setPage(next);
+  };
+
+  useEffect(() => {
+    if (isControlled) setPage(controlledPage);
+  }, [controlledPage, isControlled]);
 
   const fetchCategories = useMemo(
     () => async () => {
@@ -42,20 +62,23 @@ export default function ProductGrid() {
       setLoading(true);
       setError('');
       try {
-        const params = { page, limit: pageSize };
+        const params = { page: pageToUse, limit: pageSize, sort, ...extraFilters };
         if (query) params.q = query;
         if (status !== 'all') params.status = status;
         if (category !== 'all') params.category = category;
         const res = await getProducts(api, params);
+        const nextTotal = res.data?.total || 0;
         setProducts(res.data?.products || []);
-        setTotal(res.data?.total || 0);
+        setTotal(nextTotal);
+        const totalPages = Math.max(1, Math.ceil(nextTotal / pageSize));
+        onMeta?.({ page: pageToUse, total: nextTotal, totalPages, pageSize });
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to load products');
       } finally {
         setLoading(false);
       }
     },
-    [api, category, page, pageSize, query, status],
+    [api, category, pageToUse, pageSize, query, status, sort, onMeta],
   );
 
   useEffect(() => {
@@ -70,13 +93,14 @@ export default function ProductGrid() {
     setQuery('');
     setStatus('Published');
     setCategory('all');
-    setPage(1);
+    updatePage(1);
   };
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const currentPage = Math.min(page, totalPages);
+  const currentPage = Math.min(pageToUse, totalPages);
   const rangeStart = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const rangeEnd = total === 0 ? 0 : Math.min(total, currentPage * pageSize);
+  const useInlinePager = Boolean(inlinePager);
 
   const categoryOptions = useMemo(
     () => [{ _id: 'all', name: 'All categories' }, ...categories],
@@ -84,10 +108,10 @@ export default function ProductGrid() {
   );
 
   useEffect(() => {
-    if (page > totalPages) {
+    if (!isControlled && pageToUse > totalPages) {
       setPage(totalPages);
     }
-  }, [page, totalPages]);
+  }, [isControlled, pageToUse, totalPages]);
 
   const handleDelete = async (id) => {
     if (!isAdmin) return;
@@ -107,12 +131,14 @@ export default function ProductGrid() {
   return (
     <div className="space-y-4 -mt-2">
       <div className="p-1 space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-text-primary dark:text-text-light">Product Grid</h1>
-            <p className="text-sm text-text-secondary dark:text-text-light/70">Preview customer-style grid.</p>
+        {!hideHeading ? (
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-text-primary dark:text-text-light">Product Grid</h1>
+              <p className="text-sm text-text-secondary dark:text-text-light/70">Preview customer-style grid.</p>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="flex flex-col md:flex-row gap-3">
           <div className="flex items-center gap-2 flex-1 rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2">
@@ -123,7 +149,7 @@ export default function ProductGrid() {
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
-                setPage(1);
+                updatePage(1);
               }}
             />
           </div>
@@ -132,7 +158,7 @@ export default function ProductGrid() {
             value={status}
             onChange={(e) => {
               setStatus(e.target.value);
-              setPage(1);
+              updatePage(1);
             }}
             className="rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 text-sm text-text-primary dark:text-text-light"
           >
@@ -146,7 +172,7 @@ export default function ProductGrid() {
             value={category}
             onChange={(e) => {
               setCategory(e.target.value);
-              setPage(1);
+              updatePage(1);
             }}
             className="rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 text-sm text-text-primary dark:text-text-light"
           >
@@ -165,14 +191,40 @@ export default function ProductGrid() {
           </button>
         </div>
 
+        {useInlinePager ? (
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between text-sm text-text-secondary dark:text-text-light/70">
+            <div>
+              Showing {rangeStart}-{rangeEnd} of {total} products
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                disabled={currentPage <= 1}
+                onClick={() => updatePage(Math.max(1, currentPage - 1))}
+                className="rounded-full border border-primary/25 px-4 py-2 text-sm font-semibold text-text-secondary disabled:opacity-50"
+              >
+                Prev
+              </button>
+              <span className="rounded-full border border-primary/25 px-3 py-2 text-sm font-semibold text-text-primary dark:text-text-light">
+                {currentPage}
+              </span>
+              <button
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => updatePage(Math.min(totalPages, currentPage + 1))}
+                className="rounded-full border border-primary/25 px-4 py-2 text-sm font-semibold text-text-primary dark:text-text-light disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {error ? (
           <div className="rounded-lg border border-rose-200 bg-rose-50 text-rose-700 px-3 py-2 text-sm">{error}</div>
         ) : null}
 
         <div className="space-y-3">
-          <div className="text-sm text-text-secondary dark:text-text-light/70">
-            Showing {rangeStart}-{rangeEnd} of {total} products
-          </div>
           {loading ? (
             <div className="rounded-lg border border-primary/10 bg-light-bg dark:bg-dark-hover px-4 py-6 text-center text-text-secondary dark:text-text-light/70">
               Loading products...
@@ -198,106 +250,109 @@ export default function ProductGrid() {
                     {image ? (
                       <img src={image} alt={product.name} className="w-full h-48 object-cover" />
                     ) : (
-                      <div className="w-full h-48 bg-light-bg dark:bg-dark-hover flex items-center justify-center text-text-secondary">No image</div>
+                      <div className="w-full h-48 bg-light-bg dark:bg-dark-hover flex items-center justify-center text-text-secondary">
+                        No Image
+                      </div>
                     )}
-                    <div className="absolute top-3 left-3 flex flex-wrap gap-2">
-                      {product.isFeatured ? (
-                        <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">Featured</span>
-                      ) : null}
-                      {product.isPromoted ? (
-                        <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">Promoted</span>
-                      ) : null}
-                      {product.isExclusive ? (
-                        <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">Exclusive</span>
+                    <div className="absolute top-2 right-2 flex gap-2">
+                      <Link
+                        to={`/cpanel/products/edit/${product._id}`}
+                        className="inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-text-primary shadow-sm hover:bg-white"
+                      >
+                        <FiEdit2 /> Edit
+                      </Link>
+                      {isAdmin ? (
+                        <button
+                          type="button"
+                          disabled={deletingId === product._id}
+                          onClick={() => handleDelete(product._id)}
+                          className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-100 disabled:opacity-50"
+                        >
+                          <FiTrash2 /> Delete
+                        </button>
                       ) : null}
                     </div>
-                    <div className="absolute top-3 right-3">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusClass(product.status)}`}>
+                  </div>
+                  <div className="flex flex-1 flex-col gap-3 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-lg font-bold text-text-primary dark:text-text-light leading-tight">
+                          {product.name}
+                        </h3>
+                        <p className="text-xs text-text-secondary dark:text-text-light/70">
+                          {product.category?.name || 'Uncategorized'}
+                        </p>
+                      </div>
+                      <span
+                        className={`px-2 py-1 rounded-full text-[11px] font-semibold ${statusClass(product.status)}`}
+                      >
                         {product.status}
                       </span>
                     </div>
-                  </div>
-                  <div className="p-4 space-y-2 flex-1">
-                    <div className="text-xs uppercase tracking-wide text-text-secondary dark:text-text-light/70">
-                      {product.category?.name || 'Uncategorized'} · {product.stock ?? 0} in stock
-                    </div>
-                    <div className="text-lg font-semibold text-text-primary dark:text-text-light">{product.name}</div>
-                    <div className="text-sm text-text-secondary dark:text-text-light/70 line-clamp-2">
-                      {product.shortDescription || 'No description'}
-                    </div>
-                    <div className="flex items-center gap-2 pt-1">
-                      <div className="text-xl font-bold text-text-primary dark:text-text-light">
-                        ${Number(product.currentPrice || 0).toLocaleString()}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xl font-extrabold text-primary">
+                        ${product.currentPrice?.toFixed ? product.currentPrice.toFixed(2) : product.currentPrice}
+                        {product.originalPrice ? (
+                          <span className="text-xs text-text-secondary line-through">
+                            ${product.originalPrice}
+                          </span>
+                        ) : null}
                       </div>
-                      {product.originalPrice ? (
-                        <div className="text-sm line-through text-text-secondary/70">
-                          ${Number(product.originalPrice).toLocaleString()}
-                        </div>
-                      ) : null}
+                      <div className="text-xs text-text-secondary dark:text-text-light/70">Stock: {product.stock ?? 0}</div>
                     </div>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {product.tags?.slice(0, 4).map((tag) => (
-                        <span key={tag} className="px-2 py-1 rounded-full bg-light-bg dark:bg-dark-hover text-xs text-text-secondary border border-primary/10">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
+                    <p className="text-sm text-text-secondary dark:text-text-light/80 line-clamp-2">
+                      {product.shortDescription || 'No description.'}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2 px-4 pb-4">
+                  <div className="flex items-center justify-between border-t border-primary/10 bg-light-bg/60 dark:bg-dark-hover px-4 py-3">
                     <Link
                       to={publicLink}
-                      className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-primary/20 text-text-primary dark:text-text-light hover:bg-primary/10 transition text-sm"
-                      title="View public page"
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
+                      target="_blank"
+                      rel="noreferrer"
                     >
-                      <FiExternalLink /> View
+                      <FiExternalLink /> View public page
                     </Link>
                     <Link
                       to={`/cpanel/products/edit/${product._id}`}
-                      className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg border border-primary/20 text-text-primary dark:text-text-light hover:bg-primary/10 transition text-sm"
-                      title="Edit"
+                      className="inline-flex items-center gap-2 rounded-lg border border-primary/20 px-3 py-1.5 text-sm font-semibold text-text-primary hover:bg-primary/10"
                     >
                       <FiEdit2 /> Edit
                     </Link>
-                    {isAdmin ? (
-                      <button
-                        disabled={deletingId === product._id}
-                        onClick={() => handleDelete(product._id)}
-                        className="p-2 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 transition disabled:opacity-50"
-                        title="Delete"
-                      >
-                        <FiTrash2 />
-                      </button>
-                    ) : null}
                   </div>
                 </div>
               );
             })}
           </div>
-        </div>
 
-        <div className="flex flex-col md:flex-row items-center justify-between gap-3 pt-3 text-sm text-text-secondary dark:text-text-light/70 border-t border-primary/10">
-          <span>
-            Showing {rangeStart}-{rangeEnd} of {total} products
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              disabled={currentPage === 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="p-2 rounded-lg border border-primary/20 text-text-primary dark:text-text-light disabled:opacity-40 hover:bg-primary/10 transition"
-            >
-              <MdOutlineArrowBackIos size={16} />
-            </button>
-            <div className="px-3 py-1 rounded-lg bg-light-bg dark:bg-dark-hover border border-primary/10 text-text-primary dark:text-text-light">
-              {currentPage} / {totalPages}
+          {!hidePagination && !useInlinePager ? (
+            <div className="flex items-center justify-between text-sm text-text-secondary dark:text-text-light/70">
+              <div>
+                Showing {rangeStart}-{rangeEnd} of {total} products
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => updatePage(Math.max(1, currentPage - 1))}
+                  className="inline-flex items-center gap-1 rounded-lg border border-primary/20 px-3 py-1.5 text-text-primary dark:text-text-light hover:bg-primary/10 disabled:opacity-50"
+                >
+                  <MdOutlineArrowBackIos /> Prev
+                </button>
+                <span className="min-w-[50px] text-center font-semibold text-text-primary dark:text-text-light">
+                  {currentPage} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => updatePage(Math.min(totalPages, currentPage + 1))}
+                  className="inline-flex items-center gap-1 rounded-lg border border-primary/20 px-3 py-1.5 text-text-primary dark:text-text-light hover:bg-primary/10 disabled:opacity-50"
+                >
+                  Next <MdOutlineArrowForwardIos />
+                </button>
+              </div>
             </div>
-            <button
-              disabled={currentPage === totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              className="p-2 rounded-lg border border-primary/20 text-text-primary dark:text-text-light disabled:opacity-40 hover:bg-primary/10 transition"
-            >
-              <MdOutlineArrowForwardIos size={16} />
-            </button>
-          </div>
+          ) : null}
         </div>
       </div>
     </div>

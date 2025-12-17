@@ -1,12 +1,11 @@
-import { useContext } from 'react';
 import { Outlet } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
 import Sidebar from './Sidebar';
-import { CpanelContext } from '../context/CpanelProvider';
+import { useCpanelUi } from '../context/CpanelUiProvider';
 
 export default function Layout() {
-  const { sidebar, handleSidebar } = useContext(CpanelContext);
+  const { sidebar, handleSidebar } = useCpanelUi();
 
   return (
     <div className="relative min-h-screen bg-light-bg text-light-text dark:bg-dark-bg dark:text-text-light">

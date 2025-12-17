@@ -15,6 +15,7 @@ export default function ProductTable() {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
   const [category, setCategory] = useState('all');
+  const [tab, setTab] = useState('all');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -37,6 +38,20 @@ export default function ProductTable() {
     [api],
   );
 
+  const tabs = useMemo(
+    () => [
+      { key: 'all', label: 'All' },
+      { key: 'published', label: 'Published' },
+      { key: 'draft', label: 'Draft' },
+      { key: 'archived', label: 'Archived' },
+      { key: 'featured', label: 'Featured' },
+      { key: 'trending', label: 'Trending' },
+      { key: 'exclusive', label: 'Exclusive/Promoted' },
+      { key: 'outofstock', label: 'Out of Stock' },
+    ],
+    [],
+  );
+
   const fetchProducts = useMemo(
     () => async () => {
       setLoading(true);
@@ -44,18 +59,39 @@ export default function ProductTable() {
       try {
         const params = { page, limit: pageSize };
         if (query) params.q = query;
-        if (status !== 'all') params.status = status;
         if (category !== 'all') params.category = category;
+        // tab-driven status/flags (server-side)
+        if (tab === 'published') params.status = 'Published';
+        else if (tab === 'draft') params.status = 'Draft';
+        else if (tab === 'archived') params.status = 'Archived';
+        if (tab === 'featured') params.featured = true;
+        if (tab === 'trending') params.promoted = true;
+        // fallback to dropdown status when tab is "all"
+        if (tab === 'all' && status !== 'all') params.status = status;
+
         const res = await getProducts(api, params);
-        setProducts(res.data?.products || []);
-        setTotal(res.data?.total || 0);
+        let nextProducts = res.data?.products || [];
+
+        // client-side filters for cases not supported by API
+        if (tab === 'exclusive') {
+          nextProducts = nextProducts.filter((p) => p.isExclusive || p.isPromoted);
+        }
+        if (tab === 'outofstock') {
+          nextProducts = nextProducts.filter((p) => (p.stock ?? 0) <= 0);
+        }
+
+        const nextTotal =
+          tab === 'exclusive' || tab === 'outofstock' ? nextProducts.length : res.data?.total || 0;
+
+        setProducts(nextProducts);
+        setTotal(nextTotal);
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to load products');
       } finally {
         setLoading(false);
       }
     },
-    [api, category, page, pageSize, query, status],
+    [api, category, page, pageSize, query, status, tab],
   );
 
   useEffect(() => {
@@ -70,6 +106,7 @@ export default function ProductTable() {
     setQuery('');
     setStatus('all');
     setCategory('all');
+    setTab('all');
     setPage(1);
   };
 
@@ -125,7 +162,8 @@ export default function ProductTable() {
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-3">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col md:flex-row gap-3">
           <div className="flex items-center gap-2 flex-1 rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2">
             <FiSearch className="text-text-secondary" />
             <input
@@ -175,6 +213,25 @@ export default function ProductTable() {
           >
             Clear Filters
           </button>
+        </div>
+
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/10 bg-light-bg/80 dark:bg-dark-hover px-2 py-2 shadow-soft">
+            {tabs.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => {
+                  setTab(t.key);
+                  setPage(1);
+                }}
+                className={`px-3 py-1.5 text-sm font-semibold rounded-full transition ${
+                  tab === t.key ? 'bg-primary text-white shadow-soft' : 'text-text-secondary hover:text-primary'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {error ? (

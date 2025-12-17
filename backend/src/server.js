@@ -28,6 +28,9 @@ import catalogCategoryRoutes from './routes/catalog/categoryRoutes.js';
 
 const app = express();
 
+// If behind a proxy/HTTPS terminator, trust it so secure cookies are honored.
+app.set('trust proxy', 1);
+
 // --- Security ---
 app.use(helmet());
 

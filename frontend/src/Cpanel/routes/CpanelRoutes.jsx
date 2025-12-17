@@ -10,6 +10,7 @@ import ProductTable from '../pages/products/ProductTable';
 import ProductGrid from '../pages/products/ProductGrid';
 import ProductList from '../pages/products/ProductList';
 import AddProduct from '../pages/products/AddProduct';
+import ProductView from '../pages/products/ProductView';
 import Categories from '../pages/categories/Categories';
 import CategoryList from '../pages/categories/CategoryList';
 import AddCategory from '../pages/categories/AddCategory';
@@ -22,6 +23,7 @@ import AddEmployee from '../pages/users/AddEmployee';
 import NotFound from '../pages/NotFound';
 import ProtectedCpanel from './ProtectedCpanel';
 import PublicCpanel from './PublicCpanel';
+import CpanelUiProvider from '../context/CpanelUiProvider';
 
 export default function CpanelRoutes() {
   return (
@@ -34,13 +36,18 @@ export default function CpanelRoutes() {
       </Route>
 
       <Route element={<ProtectedCpanel />}>
-        <Route element={<Layout />}>
+        <Route
+          element={(
+            <CpanelUiProvider>
+              <Layout />
+            </CpanelUiProvider>
+          )}
+        >
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="profile/*" element={<Profile />} />
           <Route path="products" element={<Navigate to="products/list" replace />} />
           <Route path="products/list" element={<ProductTable />} />
-          <Route path="products/grid" element={<ProductGrid />} />
-          <Route path="products/customer-list" element={<ProductList />} />
+          <Route path="products/view" element={<ProductView />} />
           <Route path="products/add" element={<AddProduct />} />
           <Route path="products/edit/:productId" element={<AddProduct />} />
           <Route path="products/*" element={<Products />} />

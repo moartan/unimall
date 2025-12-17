@@ -14,6 +14,20 @@ const validateEnv = () => {
 validateEnv();
 
 const isProd = process.env.NODE_ENV === 'production';
+const appUrl = process.env.APP_BASE_URL || '';
+
+// Decide cookie security based on explicit env, otherwise infer from app URL.
+// Using "https" app URL -> secure cookies; "http" -> insecure; otherwise default to false to avoid dropped cookies on HTTP.
+const resolveCookieSecure = () => {
+  if (process.env.COOKIES_SECURE === 'true') return true;
+  if (process.env.COOKIES_SECURE === 'false') return false;
+  if (appUrl.startsWith('https://')) return true;
+  if (appUrl.startsWith('http://')) return false;
+  return false;
+};
+
+const resolvedCookieSecure = resolveCookieSecure();
+const resolvedSameSite = process.env.COOKIES_SAMESITE || (resolvedCookieSecure ? 'none' : 'lax');
 
 const config = {
   // Pick a non-conflicting default port; override via PORT env if needed
@@ -28,9 +42,9 @@ const config = {
   cookies: {
     customerRefreshName: 'customerRefreshToken',
     employeeRefreshName: 'employeeRefreshToken',
-    // For dev (http://localhost) use lax + insecure; for prod use none + secure unless overridden
-    secure: process.env.COOKIES_SECURE === 'true' || isProd,
-    sameSite: process.env.COOKIES_SAMESITE || (isProd ? 'none' : 'lax'),
+    // Infer secure/sameSite from env or APP_BASE_URL; can override via COOKIES_SECURE / COOKIES_SAMESITE.
+    secure: resolvedCookieSecure,
+    sameSite: resolvedSameSite,
   },
   email: {
     host: process.env.SMTP_HOST,

@@ -1,21 +1,34 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { usePpanel } from '../../context/PpanelProvider.jsx';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, user, loading } = usePpanel();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  const redirectPath = useMemo(() => {
+    const fromState = location.state?.from;
+    if (typeof fromState === 'string') return fromState === '/login' ? '/' : fromState;
+    if (fromState?.pathname && fromState.pathname !== '/login') {
+      // include search/hash if present
+      const search = fromState.search || '';
+      const hash = fromState.hash || '';
+      return `${fromState.pathname}${search}${hash}`;
+    }
+    return '/';
+  }, [location.state]);
+
   useEffect(() => {
     if (!loading && user) {
-      navigate('/', { replace: true });
+      navigate(redirectPath, { replace: true });
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, redirectPath]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -23,7 +36,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       await login(email, password);
-      navigate('/profile', { replace: true });
+      navigate(redirectPath, { replace: true });
     } catch (err) {
       const message = err?.response?.data?.message || 'Invalid email or password. Please try again.';
       setError(message);

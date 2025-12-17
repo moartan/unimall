@@ -2,6 +2,19 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { baseClient, createApiClient } from '../../shared/api/client';
 
 const CpanelContext = createContext({});
+const SESSION_FLAG_KEY = 'unimall_employee_session';
+
+const hasSessionFlag = () =>
+  typeof window !== 'undefined' && window.localStorage.getItem(SESSION_FLAG_KEY) === '1';
+
+const setSessionFlag = (value) => {
+  if (typeof window === 'undefined') return;
+  if (value) {
+    window.localStorage.setItem(SESSION_FLAG_KEY, '1');
+  } else {
+    window.localStorage.removeItem(SESSION_FLAG_KEY);
+  }
+};
 
 export default function CpanelProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -15,6 +28,7 @@ export default function CpanelProvider({ children }) {
   const setToken = (token) => {
     tokenRef.current = token;
     setAccessToken(token || null);
+    setSessionFlag(Boolean(token));
   };
 
   const api = useMemo(
@@ -28,6 +42,7 @@ export default function CpanelProvider({ children }) {
   );
 
   const refreshSession = useCallback(async () => {
+    if (!hasSessionFlag()) return;
     try {
       if (!csrfRef.current) {
         const res = await baseClient.get('/csrf-token');
@@ -53,18 +68,6 @@ export default function CpanelProvider({ children }) {
     }
   }, [api, user]);
 
-  const [sidebar, setSidebar] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    const stored = window.localStorage.getItem('cpanel_sidebar_open');
-    if (stored !== null) return stored === '1';
-    return window.innerWidth >= 768;
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem('cpanel_sidebar_open', sidebar ? '1' : '0');
-  }, [sidebar]);
-
   useEffect(() => {
     if (!isCpanelRoute) {
       setLoading(false);
@@ -87,6 +90,10 @@ export default function CpanelProvider({ children }) {
     const bootstrap = async () => {
       try {
         await ensureCsrf();
+        if (!hasSessionFlag()) {
+          setLoading(false);
+          return;
+        }
         const refreshRes = await baseClient.post('/auth/employee/refresh', {});
         const token = refreshRes.data?.accessToken;
         if (token) {
@@ -124,6 +131,7 @@ export default function CpanelProvider({ children }) {
       const { data } = await api.post('/auth/employee/login', { email, password });
       setUser(data.user);
       setToken(data.accessToken);
+      setSessionFlag(true);
       return data.user;
     },
     [api],
@@ -137,27 +145,23 @@ export default function CpanelProvider({ children }) {
     }
     setUser(null);
     setToken(null);
+    setSessionFlag(false);
     if (refreshTimer.current) {
       clearInterval(refreshTimer.current);
     }
   }, [api]);
 
-  const handleSidebar = () => setSidebar((prev) => !prev);
-
   const value = useMemo(
     () => ({
       user,
       setUser,
-      sidebar,
-      setSidebar,
-      handleSidebar,
       login,
       logout,
       accessToken,
       loading,
       api,
     }),
-    [user, sidebar, login, logout, accessToken, loading, api],
+    [user, login, logout, accessToken, loading, api],
   );
   return <CpanelContext.Provider value={value}>{children}</CpanelContext.Provider>;
 }
