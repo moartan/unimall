@@ -1,32 +1,26 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import config from '../config/env.js';
 
-let transporter;
-
-// Lazily build transporter so we can validate envs at send time and reuse the instance.
-const getTransporter = () => {
-  if (transporter) return transporter;
-  const { host, port, user, pass } = config.email;
-  if (!host || !port || !user || !pass) {
-    throw new Error('Email transport is not fully configured (missing host/port/user/pass)');
-  }
-  transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: Number(port) === 465,
-    auth: { user, pass },
-  });
-  return transporter;
-};
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 export const sendEmail = async ({ to, subject, html, from }) => {
   if (!to) throw new Error('Email recipient is required');
-  const mailer = getTransporter();
-  const fromAddress = from || config.email.from || config.email.user;
-  return mailer.sendMail({
+  if (!resend) throw new Error('Resend API key is missing');
+  const defaultSender = config.email.from || 'onboarding@resend.dev';
+  const brandName = process.env.EMAIL_FROM_NAME || 'Unimall';
+  const fromAddress =
+    from ||
+    (defaultSender.includes('<') ? defaultSender : `${brandName} <${defaultSender}>`);
+
+  const result = await resend.emails.send({
     from: fromAddress,
     to,
     subject,
     html,
   });
+
+  if (result?.error) {
+    throw new Error(result.error.message || 'Failed to send email');
+  }
+  return result;
 };
