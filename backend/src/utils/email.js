@@ -1,26 +1,37 @@
-import { Resend } from 'resend';
+import sgMail from '@sendgrid/mail';
 import config from '../config/env.js';
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const apiKey = process.env.SENDGRID_API_KEY;
+if (apiKey) {
+  sgMail.setApiKey(apiKey);
+}
 
 export const sendEmail = async ({ to, subject, html, from }) => {
+  if (!apiKey) throw new Error('SendGrid API key is missing');
   if (!to) throw new Error('Email recipient is required');
-  if (!resend) throw new Error('Resend API key is missing');
-  const defaultSender = config.email.from || 'onboarding@resend.dev';
+
   const brandName = process.env.EMAIL_FROM_NAME || 'Unimall';
-  const fromAddress =
-    from ||
-    (defaultSender.includes('<') ? defaultSender : `${brandName} <${defaultSender}>`);
+  const defaultSender = config.email.from || 'no-reply@unimall.com';
+  const fromAddress = from || (defaultSender.includes('<') ? defaultSender : `${brandName} <${defaultSender}>`);
 
-  const result = await resend.emails.send({
-    from: fromAddress,
-    to,
-    subject,
-    html,
-  });
+  try {
+    const [response] = await sgMail.send({
+      to,
+      from: fromAddress,
+      subject,
+      html,
+    });
 
-  if (result?.error) {
-    throw new Error(result.error.message || 'Failed to send email');
+    if (response?.statusCode >= 400) {
+      throw new Error(`SendGrid failed with status ${response.statusCode}`);
+    }
+    return response;
+  } catch (err) {
+    const sgErrors = err?.response?.body?.errors;
+    const message =
+      (Array.isArray(sgErrors) && sgErrors.map((e) => e.message).join('; ')) ||
+      err?.message ||
+      'Failed to send email';
+    throw new Error(message);
   }
-  return result;
 };

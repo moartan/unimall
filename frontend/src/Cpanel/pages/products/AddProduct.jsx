@@ -3,17 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { FiUploadCloud } from 'react-icons/fi';
 import { useCpanel } from '../../context/CpanelProvider';
 import { createProduct, getCategories, getProduct, updateProduct, uploadProductImages } from '../../api/catalog';
-
-const generateSku = (name) => {
-  const base = (name || '')
-    .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .toUpperCase()
-    .slice(0, 16);
-  const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
-  const prefix = base || 'PRD';
-  return `${prefix}-${rand}`;
-};
+import { clearListCache } from './components/cache';
 
 export default function AddProduct() {
   const { api } = useCpanel();
@@ -23,22 +13,17 @@ export default function AddProduct() {
   const initialFormState = {
     name: '',
     brand: '',
-    sku: '',
-    currentPrice: '',
-    originalPrice: '',
-    costPrice: '',
+    totalCost: '',
+    regularPrice: '',
+    salePrice: '',
     stock: '',
     category: '',
-    topLabel: '',
-    promoEnd: '',
     shortDesc: '',
     description: '',
     featured: false,
-    promoted: false,
     exclusive: false,
-    tags: '',
-    keywords: '',
     status: 'Draft',
+    displayPriority: '',
   };
   const [form, setForm] = useState({
     ...initialFormState,
@@ -51,37 +36,36 @@ export default function AddProduct() {
   const [error, setError] = useState('');
   const [removeImagePublicIds, setRemoveImagePublicIds] = useState([]);
   const [coverImageId, setCoverImageId] = useState(null);
-  const [variants, setVariants] = useState([]);
-  const [skuEdited, setSkuEdited] = useState(false);
+  const [previewIdx, setPreviewIdx] = useState(0);
 
-  const previewPrice = form.currentPrice || '0.00';
+  const previewPrice = form.salePrice || '0.00';
   const previewName = form.name || 'Product Name';
   const previewShort = form.shortDesc || 'Short description';
   const previewCat = useMemo(() => {
     const found = categories.find((cat) => cat._id === form.category);
     return found?.name || 'Category';
   }, [categories, form.category]);
-  const previewImage = useMemo(() => {
-    if (!images.length) return null;
-    const cover = images.find((img) => img.id === coverImageId);
-    return (cover || images[0])?.url;
-  }, [coverImageId, images]);
+  const displayImages = useMemo(() => {
+    if (!images.length) return [];
+    const arranged = [...images];
+    if (coverImageId) {
+      const coverIndex = arranged.findIndex((img) => img.id === coverImageId);
+      if (coverIndex > 0) {
+        const [cover] = arranged.splice(coverIndex, 1);
+        arranged.unshift(cover);
+      }
+    }
+    return arranged;
+  }, [images, coverImageId]);
+
+  useEffect(() => {
+    setPreviewIdx(0);
+  }, [displayImages.length, coverImageId]);
+
+  const previewImage = displayImages[previewIdx]?.url || null;
 
   const handleChange = (key, value) => {
-    if (key === 'name') {
-      setForm((prev) => {
-        const next = { ...prev, name: value };
-        if (!skuEdited && value) {
-          next.sku = generateSku(value);
-        }
-        return next;
-      });
-    } else if (key === 'sku') {
-      setSkuEdited(true);
-      setForm((prev) => ({ ...prev, sku: value }));
-    } else {
-      setForm((prev) => ({ ...prev, [key]: value }));
-    }
+    setForm((prev) => ({ ...prev, [key]: value }));
   };
 
   useEffect(() => {
@@ -106,22 +90,17 @@ export default function AddProduct() {
         setForm({
           name: product.name || '',
           brand: product.brand || '',
-          sku: product.sku || '',
-          currentPrice: product.currentPrice ?? '',
-          originalPrice: product.originalPrice ?? '',
-          costPrice: product.costPrice ?? '',
+          totalCost: product.totalCost ?? '',
+          regularPrice: product.regularPrice ?? '',
+          salePrice: product.salePrice ?? '',
           stock: product.stock ?? '',
           category: product.category?._id || product.category || '',
-          topLabel: product.topBarTag || '',
-          promoEnd: product.promotionEndDate ? product.promotionEndDate.slice(0, 10) : '',
           shortDesc: product.shortDescription || '',
           description: product.description || '',
           featured: !!product.isFeatured,
-          promoted: !!product.isPromoted,
           exclusive: !!product.isExclusive,
-          tags: (product.tags || []).join(', '),
-          keywords: (product.searchKeywords || []).join(', '),
           status: product.status || 'Draft',
+          displayPriority: product.displayPriority ?? '',
         });
         setImages(
           (product.images || []).map((img, idx) => ({
@@ -135,16 +114,6 @@ export default function AddProduct() {
         );
         setCoverImageId((product.images || [])[0]?.publicId || null);
         setRemoveImagePublicIds([]);
-        setVariants(
-          (product.variants || []).map((v, idx) => ({
-            id: v._id || `${v.name || 'variant'}-${idx}-${Math.random()}`,
-            name: v.name || '',
-            sku: v.sku || '',
-            price: v.price ?? '',
-            stock: v.stock ?? '',
-          })),
-        );
-        setSkuEdited(!!product.sku);
       } catch (err) {
         setError('Failed to load product');
       } finally {
@@ -156,10 +125,9 @@ export default function AddProduct() {
 
   const primaryBadge = useMemo(() => {
     if (form.featured) return 'Featured';
-    if (form.promoted) return 'Promoted';
     if (form.exclusive) return 'Exclusive';
     return null;
-  }, [form.featured, form.promoted, form.exclusive]);
+  }, [form.featured, form.exclusive]);
 
   const handleImages = (files) => {
     if (!files?.length) return;
@@ -225,32 +193,38 @@ export default function AddProduct() {
     setImages([]);
     setCoverImageId(null);
     setRemoveImagePublicIds([]);
-    setVariants([]);
     setError('');
-    setSkuEdited(false);
   };
 
   const buildPayload = async (statusOverride) => {
-    const tags = form.tags
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
-    const keywords = form.keywords
-      .split(',')
-      .map((k) => k.trim())
-      .filter(Boolean);
-    const toUpload = images.filter((img) => img.file);
+    const newImages = images.filter((img) => img.isNew && img.file);
+    const newFiles = newImages.map((img) => img.file);
     let uploaded = [];
-    if (toUpload.length) {
-      const res = await uploadProductImages(api, toUpload.map((img) => img.file));
-      uploaded = res.data?.images || [];
-    }
-    const uploadedMap = new Map();
-    toUpload.forEach((img, idx) => {
-      if (uploaded[idx]) uploadedMap.set(img.id, uploaded[idx]);
-    });
 
-    const orderedImages = [...images];
+    if (newFiles.length) {
+      try {
+        const res = await uploadProductImages(api, newFiles);
+        const uploadedFromApi = res.data?.images || [];
+        uploaded = uploadedFromApi.map((img, idx) => {
+          const original = newImages[idx];
+          return {
+            id: original?.id || img.publicId || `uploaded-${idx}`,
+            url: img.url,
+            publicId: img.publicId,
+            order: images.length + idx,
+            isNew: false,
+            alt: original?.alt || '',
+          };
+        });
+      } catch (err) {
+        setError('Failed to upload images');
+        throw err;
+      }
+    }
+
+    const existingImages = images.filter((img) => !img.isNew);
+    const mergedImages = [...existingImages, ...uploaded];
+    const orderedImages = [...mergedImages];
     if (coverImageId) {
       const coverIndex = orderedImages.findIndex((img) => img.id === coverImageId);
       if (coverIndex > 0) {
@@ -259,47 +233,31 @@ export default function AddProduct() {
       }
     }
 
-    const preparedImages = orderedImages.map((img, idx) => {
-      const uploadedImg = uploadedMap.get(img.id);
-      return {
-        url: uploadedImg?.url || img.url,
-        publicId: uploadedImg?.publicId || img.publicId,
+    const preparedImages = orderedImages
+      .map((img, idx) => ({
+        url: img.url,
+        publicId: img.publicId,
         alt: img.alt || '',
         order: idx,
-      };
-    }).filter((img) => img.url);
-
-    const preparedVariants = variants
-      .filter((v) => v.name?.trim() || v.sku?.trim() || v.price !== '' || v.stock !== '')
-      .map((v) => ({
-        name: v.name?.trim() || undefined,
-        sku: v.sku?.trim() || undefined,
-        price: v.price === '' ? undefined : Number(v.price),
-        stock: v.stock === '' ? 0 : Number(v.stock),
-      }));
+      }))
+      .filter((img) => img.url);
 
     const payload = {
       name: form.name?.trim(),
       brand: form.brand?.trim() || undefined,
-      sku: form.sku?.trim() || undefined,
-      currentPrice: Number(form.currentPrice),
-      originalPrice: form.originalPrice === '' ? undefined : Number(form.originalPrice),
-      costPrice: Number(form.costPrice),
+      totalCost: Number(form.totalCost),
+      regularPrice: Number(form.regularPrice),
+      salePrice: Number(form.salePrice),
       stock: Number(form.stock),
       category: form.category,
-      topBarTag: form.topLabel?.trim() || undefined,
-      promotionEndDate: form.promoEnd ? new Date(form.promoEnd).toISOString() : undefined,
       shortDescription: form.shortDesc?.trim() || undefined,
       description: form.description?.trim() || undefined,
       isFeatured: form.featured,
-      isPromoted: form.promoted,
       isExclusive: form.exclusive,
-      tags,
-      searchKeywords: keywords,
       status: statusOverride || form.status,
+      displayPriority: form.displayPriority === '' ? undefined : Number(form.displayPriority),
       images: preparedImages,
       removeImagePublicIds: removeImagePublicIds.length ? removeImagePublicIds : undefined,
-      variants: preparedVariants,
     };
     return payload;
   };
@@ -314,40 +272,20 @@ export default function AddProduct() {
       setError('Category is required');
       return;
     }
-    if (form.currentPrice === '' || Number.isNaN(Number(form.currentPrice))) {
-      setError('Current price is required');
+    if (form.salePrice === '' || Number.isNaN(Number(form.salePrice))) {
+      setError('Sale price is required');
       return;
     }
-    if (form.costPrice === '' || Number.isNaN(Number(form.costPrice))) {
-      setError('Cost price is required');
+    if (form.totalCost === '' || Number.isNaN(Number(form.totalCost))) {
+      setError('Total cost is required');
       return;
     }
     if (form.stock === '' || Number.isNaN(Number(form.stock))) {
       setError('Stock is required');
       return;
     }
+    // Allow saving/publishing even without images while Cloudinary is skipped.
     const statusToUse = statusOverride || form.status;
-    if (statusToUse === 'Published' && images.length === 0) {
-      setError('At least one image is required to publish a product');
-      return;
-    }
-    const skuSet = new Set();
-    const productSku = form.sku?.trim().toLowerCase();
-    for (const v of variants) {
-      if (v.sku) {
-        const key = v.sku.trim().toLowerCase();
-        if (productSku && key === productSku) {
-          setError('Variant SKU cannot match product SKU');
-          return;
-        }
-        if (skuSet.has(key)) {
-          setError('Variant SKUs must be unique');
-          return;
-        }
-        skuSet.add(key);
-      }
-    }
-
     setSaving(true);
     try {
       const payload = await buildPayload(statusOverride);
@@ -359,6 +297,7 @@ export default function AddProduct() {
       } else {
         await createProduct(api, payload);
       }
+      clearListCache();
       navigate('/cpanel/products/list');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save product');
@@ -471,57 +410,35 @@ export default function AddProduct() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-text-primary dark:text-text-light">Product SKU</label>
-              <div className="flex gap-2">
-                <input
-                  value={form.sku}
-                  onChange={(e) => handleChange('sku', e.target.value)}
-                  placeholder="SKU-PROD-001"
-                  className="flex-1 rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary text-text-primary dark:text-text-light"
-                />
-                <button
-                  type="button"
-                  className="px-3 py-2 rounded-lg border border-primary/20 text-sm text-text-primary dark:text-text-light hover:bg-primary/10 transition"
-                  onClick={() => {
-                    const next = generateSku(form.name || 'PRD');
-                    setForm((prev) => ({ ...prev, sku: next }));
-                    setSkuEdited(true);
-                  }}
-                >
-                  Generate
-                </button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-text-primary dark:text-text-light">Current Price *</label>
+              <label className="text-sm font-semibold text-text-primary dark:text-text-light">Sale Price *</label>
               <input
                 type="number"
                 min="0"
-                value={form.currentPrice}
-                onChange={(e) => handleChange('currentPrice', e.target.value)}
-                placeholder="499"
+                value={form.salePrice}
+                onChange={(e) => handleChange('salePrice', e.target.value)}
+                placeholder="120"
                 className="w-full rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary text-text-primary dark:text-text-light"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-text-primary dark:text-text-light">Original Price</label>
+              <label className="text-sm font-semibold text-text-primary dark:text-text-light">Regular Price *</label>
               <input
                 type="number"
                 min="0"
-                value={form.originalPrice}
-                onChange={(e) => handleChange('originalPrice', e.target.value)}
-                placeholder="599"
+                value={form.regularPrice}
+                onChange={(e) => handleChange('regularPrice', e.target.value)}
+                placeholder="125"
                 className="w-full rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary text-text-primary dark:text-text-light"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-text-primary dark:text-text-light">Cost Price *</label>
+              <label className="text-sm font-semibold text-text-primary dark:text-text-light">Total Cost *</label>
               <input
                 type="number"
                 min="0"
-                value={form.costPrice}
-                onChange={(e) => handleChange('costPrice', e.target.value)}
-                placeholder="400"
+                value={form.totalCost}
+                onChange={(e) => handleChange('totalCost', e.target.value)}
+                placeholder="105"
                 className="w-full rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary text-text-primary dark:text-text-light"
               />
             </div>
@@ -552,22 +469,16 @@ export default function AddProduct() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-text-primary dark:text-text-light">Top Bar Label</label>
-              <input
-                value={form.topLabel}
-                onChange={(e) => handleChange('topLabel', e.target.value)}
-                placeholder="25% OFF"
+              <label className="text-sm font-semibold text-text-primary dark:text-text-light">Status</label>
+              <select
+                value={form.status}
+                onChange={(e) => handleChange('status', e.target.value)}
                 className="w-full rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary text-text-primary dark:text-text-light"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-text-primary dark:text-text-light">Promotion End Date</label>
-              <input
-                type="date"
-                value={form.promoEnd}
-                onChange={(e) => handleChange('promoEnd', e.target.value)}
-                className="w-full rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary text-text-primary dark:text-text-light"
-              />
+              >
+                <option value="Draft">Draft</option>
+                <option value="Published">Published</option>
+                <option value="Archived">Archived</option>
+              </select>
             </div>
           </div>
 
@@ -591,164 +502,6 @@ export default function AddProduct() {
             />
           </div>
 
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm font-semibold text-text-primary dark:text-text-light">Variants &amp; SKUs</div>
-                <div className="text-xs text-text-secondary dark:text-text-light/70">
-                  Optional variants; leave blank if not needed.
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  setVariants((prev) => [
-                    ...prev,
-                    { id: `variant-${Date.now()}-${Math.random()}`, name: '', sku: '', price: '', stock: '' },
-                  ])
-                }
-                className="px-3 py-2 rounded-lg border border-primary/20 text-sm text-text-primary dark:text-text-light hover:bg-primary/10 transition"
-              >
-                + Add variant
-              </button>
-            </div>
-            {variants.length ? (
-              <div className="space-y-2">
-                {variants.map((variant, idx) => (
-                  <div
-                    key={variant.id}
-                    className="grid md:grid-cols-4 gap-3 items-end rounded-xl border border-primary/15 bg-light-bg dark:bg-dark-bg p-3"
-                  >
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-text-secondary dark:text-text-light/80">Name</label>
-                      <input
-                        value={variant.name}
-                        onChange={(e) =>
-                          setVariants((prev) =>
-                            prev.map((v) => (v.id === variant.id ? { ...v, name: e.target.value } : v)),
-                          )
-                        }
-                        placeholder="Size / Color"
-                        className="w-full rounded-lg border border-primary/20 bg-white dark:bg-dark-bg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm text-text-primary dark:text-text-light"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-text-secondary dark:text-text-light/80">SKU</label>
-                      <input
-                        value={variant.sku}
-                        onChange={(e) =>
-                          setVariants((prev) =>
-                            prev.map((v) => (v.id === variant.id ? { ...v, sku: e.target.value } : v)),
-                          )
-                        }
-                        placeholder="SKU123"
-                        className="w-full rounded-lg border border-primary/20 bg-white dark:bg-dark-bg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm text-text-primary dark:text-text-light"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-text-secondary dark:text-text-light/80">Price</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={variant.price}
-                        onChange={(e) =>
-                          setVariants((prev) =>
-                            prev.map((v) => (v.id === variant.id ? { ...v, price: e.target.value } : v)),
-                          )
-                        }
-                        placeholder="0"
-                        className="w-full rounded-lg border border-primary/20 bg-white dark:bg-dark-bg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm text-text-primary dark:text-text-light"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-text-secondary dark:text-text-light/80">Stock</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min="0"
-                          value={variant.stock}
-                          onChange={(e) =>
-                            setVariants((prev) =>
-                              prev.map((v) => (v.id === variant.id ? { ...v, stock: e.target.value } : v)),
-                            )
-                          }
-                          placeholder="0"
-                          className="w-full rounded-lg border border-primary/20 bg-white dark:bg-dark-bg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary text-sm text-text-primary dark:text-text-light"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setVariants((prev) => prev.filter((v) => v.id !== variant.id))}
-                          className="p-2 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 transition"
-                          title="Remove variant"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-xs text-text-secondary dark:text-text-light/70 border border-dashed border-primary/20 rounded-lg px-3 py-2">
-                No variants added. You can add size/color options here.
-              </div>
-            )}
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-3">
-            <label className="inline-flex items-center gap-2 text-sm font-semibold text-text-secondary dark:text-text-light/80">
-              <input
-                type="checkbox"
-                checked={form.featured}
-                onChange={(e) => handleChange('featured', e.target.checked)}
-                className="text-primary focus:ring-primary"
-              />
-              Featured product
-            </label>
-            <label className="inline-flex items-center gap-2 text-sm font-semibold text-text-secondary dark:text-text-light/80">
-              <input
-                type="checkbox"
-                checked={form.promoted}
-                onChange={(e) => handleChange('promoted', e.target.checked)}
-                className="text-primary focus:ring-primary"
-              />
-              Promoted product
-            </label>
-            <label className="inline-flex items-center gap-2 text-sm font-semibold text-text-secondary dark:text-text-light/80">
-              <input
-                type="checkbox"
-                checked={form.exclusive}
-                onChange={(e) => handleChange('exclusive', e.target.checked)}
-                className="text-primary focus:ring-primary"
-              />
-              Exclusive / limited edition
-            </label>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-text-primary dark:text-text-light">Tags</label>
-              <input
-                value={form.tags}
-                onChange={(e) => handleChange('tags', e.target.value)}
-                placeholder="summer, smart-watch, bluetooth"
-                className="w-full rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary text-text-primary dark:text-text-light"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-text-primary dark:text-text-light">Search Keywords</label>
-              <input
-                value={form.keywords}
-                onChange={(e) => handleChange('keywords', e.target.value)}
-                placeholder="noise cancelling, AMOLED, USB-C"
-                className="w-full rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary text-text-primary dark:text-text-light"
-              />
-            </div>
-          </div>
-
-          <div className="pt-2 flex items-center justify-end gap-2">
-            {/* Actions moved to sidebar */}
-          </div>
         </div>
       </div>
 
@@ -761,15 +514,41 @@ export default function AddProduct() {
         </div>
 
         <div className="rounded-xl border border-primary/10 bg-light-bg dark:bg-dark-hover p-4 space-y-3">
-          {previewImage ? (
-            <div className="w-full h-40 rounded-lg overflow-hidden border border-primary/10">
-              <img src={previewImage} alt="Preview" className="w-full h-full object-cover" />
-            </div>
-          ) : (
-            <div className="w-full h-40 rounded-lg bg-accent-bg dark:bg-dark-card flex items-center justify-center text-text-secondary">
-              Preview
-            </div>
-          )}
+          <div className="w-full h-48 rounded-lg overflow-hidden border border-primary/10 bg-white dark:bg-dark-hover flex items-center justify-center p-2 relative group">
+            {displayImages.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-1.5 shadow hover:bg-white opacity-0 group-hover:opacity-100 transition"
+                  onClick={() => setPreviewIdx((idx) => (idx - 1 + displayImages.length) % displayImages.length)}
+                  aria-label="Previous image"
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-1.5 shadow hover:bg-white opacity-0 group-hover:opacity-100 transition"
+                  onClick={() => setPreviewIdx((idx) => (idx + 1) % displayImages.length)}
+                  aria-label="Next image"
+                >
+                  ›
+                </button>
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                  {displayImages.map((img, idx) => (
+                    <span
+                      key={img.id || img.publicId || img.url || idx}
+                      className={`h-1.5 w-1.5 rounded-full ${idx === previewIdx ? 'bg-primary' : 'bg-primary/30'}`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+            {previewImage ? (
+              <img src={previewImage} alt="Preview" className="max-h-full max-w-full object-contain" />
+            ) : (
+              <div className="text-text-secondary text-sm">Preview</div>
+            )}
+          </div>
           {primaryBadge ? (
             <div className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
               {primaryBadge}
@@ -812,16 +591,7 @@ export default function AddProduct() {
               />
               Featured product
             </label>
-            <label className="inline-flex items-center gap-2 text-sm font-semibold text-text-secondary dark:text-text-light/80">
-              <input
-                type="checkbox"
-                checked={form.promoted}
-                onChange={(e) => handleChange('promoted', e.target.checked)}
-                className="text-primary focus:ring-primary"
-              />
-              Promoted product
-            </label>
-            <label className="inline-flex items-center gap-2 text-sm font-semibold text-text-secondary dark:text-text-light/80">
+            <label className="inline-flex items-center gap-2 text-sm font-semibold text-text-secondary dark:text-text-light/80 mt-1">
               <input
                 type="checkbox"
                 checked={form.exclusive}
@@ -839,28 +609,26 @@ export default function AddProduct() {
           </div>
         ) : null}
 
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <button
             disabled={saving}
-            className="w-full px-4 py-2 rounded-lg border border-primary/20 text-text-secondary dark:text-text-light/80 hover:bg-primary/10 transition disabled:opacity-60"
-            onClick={() => handleSubmit('Draft')}
+            className="w-full sm:flex-1 px-5 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold shadow-soft transition disabled:opacity-60"
+            onClick={() => handleSubmit()}
             type="button"
           >
-            {saving ? 'Saving...' : 'Save as Draft'}
-          </button>
-          <button
-            disabled={saving}
-            className="w-full px-5 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold shadow-soft transition disabled:opacity-60"
-            onClick={() => handleSubmit('Published')}
-            type="button"
-          >
-            {saving ? 'Saving...' : 'Publish Product'}
+            {saving
+              ? 'Saving...'
+              : form.status === 'Published'
+              ? 'Publish Product'
+              : form.status === 'Archived'
+              ? 'Archive Product'
+              : 'Save as Draft'}
           </button>
           <button
             type="button"
             disabled={saving}
             onClick={resetForm}
-            className="w-full px-4 py-2 rounded-lg border border-primary/20 text-text-secondary dark:text-text-light/80 hover:bg-primary/10 transition disabled:opacity-60"
+            className="w-full sm:w-auto sm:px-4 sm:flex-none px-4 py-2 rounded-lg border border-primary/20 text-text-secondary dark:text-text-light/80 hover:bg-primary/10 transition disabled:opacity-60"
           >
             Clear
           </button>

@@ -75,17 +75,34 @@ export default function Products() {
     category: p.category?.slug || p.category?.name?.toLowerCase() || String(p.category || "uncategorized"),
     categoryId: p.category?._id || (typeof p.category === "string" ? p.category : undefined),
     stock: `${p.stock ?? 0} in stock`,
-    price: Number(p.currentPrice || 0),
-    originalPrice: p.originalPrice ? Number(p.originalPrice) : null,
-    badge: p.isFeatured ? "Featured" : p.isPromoted ? "Promoted" : "",
+    price: Number(p.salePrice ?? p.price ?? p.currentPrice ?? 0),
+    originalPrice: p.regularPrice ? Number(p.regularPrice) : null,
+    badge: p.isFeatured ? "Featured" : p.isExclusive ? "Exclusive" : "",
     rating: Number(p.averageRating || 0),
     shortDesc: p.shortDescription || "",
     tags: p.tags || [],
+    images: Array.isArray(p.images) ? p.images.map((img) => img?.url).filter(Boolean) : [],
     image: p.images?.[0]?.url,
     warranty: p.promotionEndDate
       ? `Promo ends ${new Date(p.promotionEndDate).toLocaleDateString()}`
       : "Includes warranty",
   });
+
+  const adsPriorityScore = (product) => {
+    if (product.badge === "Exclusive" || product.isExclusive) return 0;
+    if (product.badge === "Featured" || product.isFeatured) return 1;
+    return 2;
+  };
+
+  const orderByAdsPriority = (list) =>
+    [...list]
+      .map((p, idx) => ({ p, idx }))
+      .sort((a, b) => {
+        const diff = adsPriorityScore(a.p) - adsPriorityScore(b.p);
+        if (diff !== 0) return diff;
+        return a.idx - b.idx; // stable within same bucket
+      })
+      .map(({ p }) => p);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -110,7 +127,7 @@ export default function Products() {
         if (sort === "price-desc") return [...mapped].sort((a, b) => b.price - a.price);
         if (sort === "name-asc") return [...mapped].sort((a, b) => a.title.localeCompare(b.title));
         if (sort === "name-desc") return [...mapped].sort((a, b) => b.title.localeCompare(a.title));
-        return mapped;
+        return orderByAdsPriority(mapped);
       })();
 
       setProducts(sorted);
@@ -297,17 +314,17 @@ export default function Products() {
   // When products change, append or reset display list
   useEffect(() => {
     if (page === 1) {
-      setDisplayProducts(products);
+      setDisplayProducts(orderByAdsPriority(products));
     } else {
       setDisplayProducts((prev) => {
         const merged = [...prev, ...products];
         const deduped = merged.filter(
           (item, idx, arr) => arr.findIndex((x) => x.id === item.id) === idx,
         );
-        return deduped;
+        return orderByAdsPriority(deduped);
       });
     }
-  }, [products, page]);
+  }, [products, page, sort]);
 
   // Push obfuscated route when available to avoid exposing /products; keep clean fallback if token unavailable.
   const handleCategoryChange = (value) => {
@@ -571,9 +588,14 @@ export default function Products() {
                   to={`/collections/view/${item.slug || item.id}`}
                   className="min-w-[180px] max-w-[180px] bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition flex-shrink-0"
                 >
-                  <div className="h-24 bg-slate-100">
+                  <div className="h-24 bg-slate-100 flex items-center justify-center">
                     {item.image ? (
-                      <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                      <img
+                        src={item.image}
+                        alt={item.title}
+                        className="w-full h-full object-contain p-2"
+                        loading="lazy"
+                      />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
                         No image

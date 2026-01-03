@@ -1,49 +1,116 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { FiExternalLink, FiEdit2, FiTrash2, FiEye } from 'react-icons/fi';
-import { MdOutlineArrowBackIos, MdOutlineArrowForwardIos } from 'react-icons/md';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useCpanel } from '../../context/CpanelProvider';
-import { deleteProduct, getCategories, getProducts } from '../../api/catalog';
+import { deleteProduct, getCategories, getProducts, updateProductPriority, restoreProduct, updateProduct } from '../../api/catalog';
+import { tabs, getTabConfig } from './components/tabs';
+import FiltersBar from './components/FiltersBar';
+import TabsBar from './components/TabsBar';
+import TableHeader from './components/TableHeader';
+import ProductRow from './components/ProductRow';
+import ProfitRow from './components/ProfitRow';
+import Pagination from './components/Pagination';
+import LoadingSkeletonRows from './components/LoadingSkeletonRows';
+import { buildListKey, getListCache, setListCache, clearListCache } from './components/cache';
+import QuickViewModal from './components/QuickViewModal';
 
 const statusClass = (status) =>
   status === 'Published'
     ? 'bg-emerald-100 text-emerald-700'
     : 'bg-amber-100 text-amber-700';
 
-export default function ProductList({
-  hideHeading = false,
-  controlledPage,
-  onPageChange,
-  hidePagination = false,
-  sort = '-createdAt',
-  onMeta,
-  inlinePager = false,
-  extraFilters = {},
-}) {
+const tierScore = (product) => {
+  if (product.isExclusive) return 0;
+  if (product.isFeatured) return 1;
+  return 2;
+};
+
+const TIER_BASE = [0, 10000, 20000];
+const PRIORITY_STEP = 10;
+
+const normalizeTier = (list, tier) => {
+  const items = list.filter((p) => tierScore(p) === tier);
+  const sortedTier = sortByTierAndPriority(items);
+  const updated = new Map();
+  sortedTier.forEach((item, idx) => {
+    updated.set(item._id, {
+      ...item,
+      displayPriority: TIER_BASE[tier] + (idx + 1) * PRIORITY_STEP,
+    });
+  });
+  return list.map((p) => {
+    if (tierScore(p) !== tier) return p;
+    const replacement = updated.get(p._id);
+    return replacement || p;
+  });
+};
+
+const normalizeAllTiers = (list) => {
+  let current = [...list];
+  [0, 1, 2].forEach((tier) => {
+    current = normalizeTier(current, tier);
+  });
+  return current;
+};
+
+const sortByTierAndPriority = (list) => {
+  return [...list].sort((a, b) => {
+    const tierDiff = tierScore(a) - tierScore(b);
+    if (tierDiff !== 0) return tierDiff;
+    const aPriority = Number.isFinite(a.displayPriority) ? a.displayPriority : 100000;
+    const bPriority = Number.isFinite(b.displayPriority) ? b.displayPriority : 100000;
+    if (aPriority !== bPriority) return aPriority - bPriority;
+    const aCreated = new Date(a.createdAt || 0).getTime();
+    const bCreated = new Date(b.createdAt || 0).getTime();
+    return aCreated - bCreated;
+  });
+};
+
+const adsBadges = (product) => {
+  const badges = [];
+  if (product.isFeatured) {
+    badges.push({ label: 'Featured', className: 'bg-emerald-100 text-emerald-700' });
+  }
+  if (product.isExclusive) {
+    badges.push({ label: 'Exclusive', className: 'bg-blue-100 text-blue-700' });
+  }
+  if (!badges.length) {
+    badges.push({ label: 'No ads', className: 'bg-rose-100 text-rose-700' });
+  }
+  return badges;
+};
+
+export default function ProductList() {
   const { api, user } = useCpanel();
-  const isControlled = typeof controlledPage === 'number';
   const [query, setQuery] = useState('');
-  const [status, setStatus] = useState('Published');
+  const [status, setStatus] = useState('all');
   const [category, setCategory] = useState('all');
-  const [page, setPage] = useState(controlledPage ?? 1);
+  const [adsFilter, setAdsFilter] = useState('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'all';
+  const [tab, setTab] = useState(initialTab);
+  const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
+  const [savingPriority, setSavingPriority] = useState(null);
+  const [togglingTrendingId, setTogglingTrendingId] = useState(null);
+  const [quickViewProduct, setQuickViewProduct] = useState(null);
+  const [restoringId, setRestoringId] = useState(null);
   const pageSize = 10;
   const isAdmin = user?.employeeRole === 'admin';
-
-  const pageToUse = controlledPage ?? page;
-  const updatePage = (next) => {
-    onPageChange?.(next);
-    if (!isControlled) setPage(next);
-  };
+  const lastKeyRef = useRef('');
 
   useEffect(() => {
-    if (isControlled) setPage(controlledPage);
-  }, [controlledPage, isControlled]);
+    setTab(initialTab);
+  }, [initialTab]);
+
+  const tabConfig = getTabConfig(tab);
+  const showPriorityColumn = Boolean(tabConfig.showPriority);
+  const isSortByPriority = showPriorityColumn;
+  const isBenefitView = Boolean(tabConfig.isBenefit);
 
   const fetchCategories = useMemo(
     () => async () => {
@@ -62,23 +129,49 @@ export default function ProductList({
       setLoading(true);
       setError('');
       try {
-        const params = { page: pageToUse, limit: pageSize, sort, ...extraFilters };
-        if (query) params.q = query;
-        if (status !== 'all') params.status = status;
+        const params = { page, limit: pageSize, tab, adsFilter };
+        if (query) {
+          params.q = query;
+          params.search = query;
+        }
         if (category !== 'all') params.category = category;
+        if (adsFilter === 'featured') params.featured = true;
+        if (adsFilter === 'exclusive') params.exclusive = true;
+        if (adsFilter === 'noads') params.noads = true;
+        if (tab === 'all' && status !== 'all') params.status = status;
+        if (isSortByPriority) params.sort = 'displayPriority createdAt';
+        if (tabConfig.applyParams) tabConfig.applyParams(params, { status });
+
+        const cacheKey = buildListKey(params);
+        lastKeyRef.current = cacheKey;
+        const cached = getListCache(cacheKey);
+        if (cached) {
+          setProducts(cached.list || []);
+          setTotal(cached.total || 0);
+        }
+
         const res = await getProducts(api, params);
-        const nextTotal = res.data?.total || 0;
-        setProducts(res.data?.products || []);
+        let nextProducts = res.data?.products || [];
+        if (adsFilter === 'exclusive') {
+          nextProducts = nextProducts.filter((p) => p.isExclusive);
+        } else if (adsFilter === 'noads') {
+          nextProducts = nextProducts.filter((p) => !p.isExclusive && !p.isFeatured);
+        }
+        nextProducts = sortByTierAndPriority(nextProducts);
+        const processed = tabConfig.processProducts ? tabConfig.processProducts(nextProducts) : { list: nextProducts, total: null };
+        nextProducts = processed.list;
+        const nextTotal = processed.total ?? (res.data?.total || nextProducts.length || 0);
+
+        setProducts(nextProducts);
         setTotal(nextTotal);
-        const totalPages = Math.max(1, Math.ceil(nextTotal / pageSize));
-        onMeta?.({ page: pageToUse, total: nextTotal, totalPages, pageSize });
+        setListCache(cacheKey, { list: nextProducts, total: nextTotal });
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to load products');
       } finally {
         setLoading(false);
       }
     },
-    [api, category, pageToUse, pageSize, query, status, sort, onMeta],
+    [api, category, page, pageSize, query, status, tab, isSortByPriority],
   );
 
   useEffect(() => {
@@ -91,16 +184,18 @@ export default function ProductList({
 
   const resetFilters = () => {
     setQuery('');
-    setStatus('Published');
+    setStatus('all');
     setCategory('all');
-    updatePage(1);
+    setAdsFilter('all');
+    setTab('all');
+    setSearchParams({ tab: 'all' });
+    setPage(1);
   };
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const currentPage = Math.min(pageToUse, totalPages);
+  const currentPage = Math.min(page, totalPages);
   const rangeStart = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const rangeEnd = total === 0 ? 0 : Math.min(total, currentPage * pageSize);
-  const useInlinePager = Boolean(inlinePager);
 
   const categoryOptions = useMemo(
     () => [{ _id: 'all', name: 'All categories' }, ...categories],
@@ -108,10 +203,10 @@ export default function ProductList({
   );
 
   useEffect(() => {
-    if (!isControlled && pageToUse > totalPages) {
+    if (page > totalPages) {
       setPage(totalPages);
     }
-  }, [isControlled, pageToUse, totalPages]);
+  }, [page, totalPages]);
 
   const handleDelete = async (id) => {
     if (!isAdmin) return;
@@ -119,7 +214,10 @@ export default function ProductList({
     if (!confirmed) return;
     setDeletingId(id);
     try {
-      await deleteProduct(api, id);
+      await deleteProduct(api, id, true);
+      setProducts((prev) => prev.filter((p) => p._id !== id));
+      setTotal((t) => Math.max(0, t - 1));
+      clearListCache();
       fetchProducts();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to delete product');
@@ -128,246 +226,257 @@ export default function ProductList({
     }
   };
 
+  const handleRestore = async (id) => {
+    if (!isAdmin) return;
+    setRestoringId(id);
+    try {
+      await restoreProduct(api, id);
+      clearListCache();
+      fetchProducts();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to restore product');
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
+  const normalizeTrending = (list) => {
+    const active = list.filter((p) => p.isTrending);
+    const normalizedActive = active.map((p, idx) => ({ ...p, trendingSort: idx + 1 }));
+    return list.map((p) => {
+      const match = normalizedActive.find((a) => a._id === p._id);
+      return match || { ...p, trendingSort: undefined };
+    });
+  };
+
+  const applyPrioritySwap = (list, index, direction) => {
+    const current = [...list];
+    const target = current[index];
+    if (!target) return current;
+    const tier = tierScore(target);
+    const sameTierIndexes = current
+      .map((p, idx) => (tierScore(p) === tier ? idx : -1))
+      .filter((idx) => idx >= 0);
+    const posInTier = sameTierIndexes.indexOf(index);
+    if (posInTier === -1) return current;
+    const swapPos = posInTier + direction;
+    if (swapPos < 0 || swapPos >= sameTierIndexes.length) return current;
+    const swapIndex = sameTierIndexes[swapPos];
+    const next = [...current];
+    const tmp = next[index];
+    next[index] = next[swapIndex];
+    next[swapIndex] = tmp;
+    const normalized = normalizeTier(next, tier);
+    return sortByTierAndPriority(normalized);
+  };
+
+  const saveTrendingOrder = async (list) => {
+    const active = list.filter((p) => p.isTrending);
+    for (let i = 0; i < active.length; i += 1) {
+      const p = active[i];
+      await updateProduct(api, p._id, {
+        isTrending: true,
+        trendingSort: p.trendingSort ?? i + 1,
+      });
+    }
+    clearListCache();
+    await fetchProducts();
+  };
+
+  const handlePriorityChange = async (index, direction) => {
+    const target = products[index];
+    const neighbor = products[index + direction];
+    if (!target || !neighbor) return;
+    // Trending tab: local reorder using trendingSort (stub until backend persists it)
+    if (tab === 'trending') {
+      if (!target.isTrending || !neighbor.isTrending) return;
+      setSavingPriority(target._id);
+      const reordered = [...products];
+      const tmp = reordered[index];
+      reordered[index] = reordered[index + direction];
+      reordered[index + direction] = tmp;
+      setProducts(normalizeTrending(reordered));
+      try {
+        await saveTrendingOrder(normalizeTrending(reordered));
+      } catch (err) {
+        setError(err.response?.data?.message || 'Failed to save trending order');
+      } finally {
+        setSavingPriority(null);
+      }
+      return;
+    }
+
+    setSavingPriority(target._id);
+    try {
+      const nextList = applyPrioritySwap(products, index, direction);
+      setProducts(nextList);
+      const updatedTarget = nextList.find((p) => p._id === target._id);
+      const updatedNeighbor = nextList.find((p) => p._id === neighbor._id);
+      if (updatedTarget && updatedNeighbor) {
+        await Promise.all([
+          updateProductPriority(api, updatedTarget._id, updatedTarget.displayPriority),
+          updateProductPriority(api, updatedNeighbor._id, updatedNeighbor.displayPriority),
+        ]);
+      }
+      clearListCache();
+      fetchProducts();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update priority');
+    } finally {
+      setSavingPriority(null);
+    }
+  };
+
+  const handleToggleTrending = async (id, nextValue) => {
+    setTogglingTrendingId(id);
+    setError('');
+    const updatedList = normalizeTrending(
+      products.map((p) => (p._id === id ? { ...p, isTrending: nextValue } : p)),
+    );
+    setProducts(updatedList);
+    const target = updatedList.find((p) => p._id === id);
+    try {
+      await updateProduct(api, id, {
+        isTrending: nextValue,
+        trendingSort: nextValue ? target?.trendingSort || 1 : 9999,
+      });
+      clearListCache();
+      await fetchProducts();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update trending status');
+    } finally {
+      setTogglingTrendingId(null);
+    }
+  };
+
   return (
     <div className="space-y-4 -mt-2">
       <div className="p-1 space-y-4">
-        {!hideHeading ? (
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold text-text-primary dark:text-text-light">Product List (Customer style)</h1>
-              <p className="text-sm text-text-secondary dark:text-text-light/70">Preview list view similar to storefront.</p>
-            </div>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-text-primary dark:text-text-light">Product List</h1>
+            <p className="text-sm text-text-secondary dark:text-text-light/70">Manage your inventory, pricing, and visibility.</p>
           </div>
-        ) : null}
-
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="flex items-center gap-2 flex-1 rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2">
-            <input
-              type="text"
-              placeholder="Search by name or ID..."
-              className="w-full bg-transparent focus:outline-none text-sm text-text-primary dark:text-text-light"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                updatePage(1);
-              }}
-            />
+          <div className="flex gap-2">
+            <button className="px-4 py-2 rounded-lg border border-primary/20 text-text-primary dark:text-text-light hover:bg-primary/10 transition">
+              Export
+            </button>
+            <Link
+              to="/cpanel/products/add"
+              className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white font-semibold shadow-soft transition"
+            >
+              + Add Product
+            </Link>
           </div>
-
-          <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              updatePage(1);
-            }}
-            className="rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 text-sm text-text-primary dark:text-text-light"
-          >
-            <option value="all">All status</option>
-            <option value="Published">Published</option>
-            <option value="Draft">Draft</option>
-            <option value="Archived">Archived</option>
-          </select>
-
-          <select
-            value={category}
-            onChange={(e) => {
-              setCategory(e.target.value);
-              updatePage(1);
-            }}
-            className="rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 text-sm text-text-primary dark:text-text-light"
-          >
-            {categoryOptions.map((cat) => (
-              <option key={cat._id} value={cat._id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-
-          <button
-            onClick={resetFilters}
-            className="whitespace-nowrap px-4 py-2 rounded-lg border border-primary/20 text-text-secondary dark:text-text-light/80 hover:bg-primary/10 transition"
-          >
-            Clear Filters
-          </button>
         </div>
 
-        {useInlinePager ? (
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between text-sm text-text-secondary dark:text-text-light/70">
-            <div>
-              Showing {rangeStart}-{rangeEnd} of {total} products
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                disabled={currentPage <= 1}
-                onClick={() => updatePage(Math.max(1, currentPage - 1))}
-                className="rounded-full border border-primary/25 px-4 py-2 text-sm font-semibold text-text-secondary disabled:opacity-50"
-              >
-                Prev
-              </button>
-              <span className="rounded-full border border-primary/25 px-3 py-2 text-sm font-semibold text-text-primary dark:text-text-light">
-                {currentPage}
-              </span>
-              <button
-                type="button"
-                disabled={currentPage >= totalPages}
-                onClick={() => updatePage(Math.min(totalPages, currentPage + 1))}
-                className="rounded-full border border-primary/25 px-4 py-2 text-sm font-semibold text-text-primary dark:text-text-light disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        ) : null}
+        <div className="flex flex-col gap-3">
+        <FiltersBar
+          query={query}
+          onQueryChange={(val) => {
+            setQuery(val);
+            setPage(1);
+          }}
+          status={status}
+          onStatusChange={(val) => {
+            setStatus(val);
+            setPage(1);
+          }}
+          category={category}
+          onCategoryChange={(val) => {
+            setCategory(val);
+            setPage(1);
+          }}
+          categoryOptions={categoryOptions}
+          adsFilter={adsFilter}
+          onAdsChange={(val) => {
+            setAdsFilter(val);
+            setPage(1);
+          }}
+          onReset={resetFilters}
+        />
+
+        <TabsBar
+          tabs={tabs}
+          active={tab}
+          onChange={(next) => {
+            setTab(next);
+            setPage(1);
+            setSearchParams({ tab: next });
+          }}
+        />
+      </div>
 
         {error ? (
           <div className="rounded-lg border border-rose-200 bg-rose-50 text-rose-700 px-3 py-2 text-sm">{error}</div>
         ) : null}
 
-        <div className="space-y-3">
-          {loading ? (
-            <div className="rounded-lg border border-primary/10 bg-light-bg dark:bg-dark-hover px-4 py-6 text-center text-text-secondary dark:text-text-light/70">
-              Loading products...
-            </div>
-          ) : null}
-          {!loading && products.length === 0 ? (
-            <div className="rounded-lg border border-primary/10 bg-light-bg dark:bg-dark-hover px-4 py-6 text-center text-text-secondary dark:text-text-light/70">
-              No products match your filters.
-            </div>
-          ) : null}
-
-          <div className="space-y-3">
-            {products.map((product) => {
-              const publicLink = product.slug
-                ? `/products/details/${product.slug}`
-                : product._id
-                  ? `/products/details/${product._id}`
-                  : '/products';
-              const tags = Array.isArray(product.tags) ? product.tags : [];
-              return (
-                <div
-                  key={product._id}
-                  className="rounded-3xl border border-primary/10 bg-white dark:bg-dark-card shadow-soft dark:shadow-strong overflow-hidden flex flex-col md:flex-row"
-                >
-                  <div className="md:w-[320px] bg-light-bg dark:bg-dark-hover flex items-center justify-center">
-                    <div className="w-full h-full">
-                      {product.images?.[0]?.url ? (
-                        <img
-                          src={product.images[0].url}
-                          alt={product.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="h-full min-h-[200px] flex items-center justify-center text-text-secondary text-sm">
-                          No image
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex-1 p-4 md:p-6 flex flex-col gap-4">
-                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-text-secondary uppercase">
-                      <span>{product.category?.name || 'Uncategorized'}</span>
-                      <span className="text-[10px]">•</span>
-                      <span>{product.stock ?? 0} in stock</span>
-                    </div>
-
-                    <div className="space-y-2">
-                      <h3 className="text-xl font-extrabold text-text-primary dark:text-text-light">
-                        {product.name}
-                      </h3>
-                      <p className="text-sm text-text-secondary dark:text-text-light/70">
-                        {product.shortDescription || 'No description available.'}
-                      </p>
-                      {tags.length ? (
-                        <div className="flex flex-wrap gap-2">
-                          {tags.map((tag) => (
-                            <span key={tag} className="px-3 py-1 rounded-full bg-light-bg dark:bg-dark-hover text-xs font-semibold text-text-secondary">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="text-3xl font-black text-primary">
-                          ${product.currentPrice?.toFixed ? product.currentPrice.toFixed(2) : product.currentPrice}
-                        </div>
-                        {product.originalPrice ? (
-                          <span className="text-base font-semibold text-text-secondary line-through">
-                            ${product.originalPrice}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2 md:gap-3">
-                        <span className={`px-3 py-1 rounded-full text-[11px] font-semibold ${statusClass(product.status)}`}>
-                          {product.status}
-                        </span>
-                        <Link
-                          to={publicLink}
-                          className="inline-flex items-center gap-2 rounded-full border border-primary/25 px-4 py-2 text-sm font-semibold text-text-primary hover:bg-primary/10"
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <FiEye /> Quick view
-                        </Link>
-                        <Link
-                          to={`/cpanel/products/edit/${product._id}`}
-                          className="inline-flex items-center gap-2 rounded-full border border-primary/25 px-4 py-2 text-sm font-semibold text-text-primary hover:bg-primary/10"
-                        >
-                          <FiEdit2 /> Edit
-                        </Link>
-                        {isAdmin ? (
-                          <button
-                            type="button"
-                            disabled={deletingId === product._id}
-                            onClick={() => handleDelete(product._id)}
-                            className="inline-flex items-center gap-2 rounded-full border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
-                          >
-                            <FiTrash2 /> Delete
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {!hidePagination && !useInlinePager ? (
-            <div className="flex items-center justify-between text-sm text-text-secondary dark:text-text-light/70">
-              <div>
-                Showing {rangeStart}-{rangeEnd} of {total} products
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={currentPage <= 1}
-                  onClick={() => updatePage(Math.max(1, currentPage - 1))}
-                  className="inline-flex items-center gap-1 rounded-lg border border-primary/20 px-3 py-1.5 text-text-primary dark:text-text-light hover:bg-primary/10 disabled:opacity-50"
-                >
-                  <MdOutlineArrowBackIos /> Prev
-                </button>
-                <span className="min-w-[50px] text-center font-semibold text-text-primary dark:text-text-light">
-                  {currentPage} / {totalPages}
-                </span>
-                <button
-                  type="button"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => updatePage(Math.min(totalPages, currentPage + 1))}
-                  className="inline-flex items-center gap-1 rounded-lg border border-primary/20 px-3 py-1.5 text-text-primary dark:text-text-light hover:bg-primary/10 disabled:opacity-50"
-                >
-                  Next <MdOutlineArrowForwardIos />
-                </button>
-              </div>
-            </div>
-          ) : null}
+        <div className="-mx-1">
+          <table className="min-w-full text-sm">
+            <TableHeader isBenefitView={isBenefitView} showPriorityColumn={showPriorityColumn} tab={tab} />
+            <tbody>
+              {loading ? <LoadingSkeletonRows isBenefitView={isBenefitView} /> : null}
+              {!loading &&
+                (() => {
+                  const tierCounters = { 0: 0, 1: 0, 2: 0 };
+                  return products.map((product, idx) => {
+                    const tier = tierScore(product);
+                    const rank = ++tierCounters[tier];
+                    return isBenefitView ? (
+                      <ProfitRow
+                        key={product._id}
+                        product={product}
+                        idx={idx}
+                        onView={setQuickViewProduct}
+                      />
+                    ) : (
+                      <ProductRow
+                        key={product._id}
+                        product={product}
+                        idx={idx}
+                        productsLength={products.length}
+                        tierRank={rank}
+                        showPriorityColumn={showPriorityColumn}
+                        savingPriority={savingPriority}
+                        onPriorityChange={handlePriorityChange}
+                        onToggleTrending={handleToggleTrending}
+                        onDelete={(id) => {
+                          setDeletingId(id);
+                          handleDelete(id);
+                        }}
+                        isAdmin={isAdmin}
+                        deletingId={deletingId}
+                        onView={setQuickViewProduct}
+                        onRestore={handleRestore}
+                        tab={tab}
+                        restoringId={restoringId}
+                        togglingTrendingId={togglingTrendingId}
+                      />
+                    );
+                  });
+                })()}
+              {!loading && products.length === 0 && (
+                <tr>
+                  <td colSpan={isBenefitView ? 8 : 7} className="px-4 py-6 text-center text-text-secondary dark:text-text-light/70">
+                    No products match your filters.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      </div>
+
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          total={total}
+          onPrev={() => setPage((p) => Math.max(1, p - 1))}
+          onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+        />
+    </div>
+      <QuickViewModal product={quickViewProduct} onClose={() => setQuickViewProduct(null)} />
     </div>
   );
 }

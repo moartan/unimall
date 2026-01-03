@@ -12,12 +12,12 @@ import {
   FaPlusCircle,
   FaList,
   FaThLarge,
-  FaListAlt,
   FaFileInvoice,
-  FaChartLine,
-  FaCogs,
-  FaQuestionCircle,
-  FaBullhorn,
+  FaExchangeAlt,
+  FaStore,
+  FaHome,
+  FaInfoCircle,
+  FaEnvelope,
 } from 'react-icons/fa';
 import logo from '../../assets/logoSmall.png';
 import { useCpanelUi } from '../context/CpanelUiProvider';
@@ -53,7 +53,7 @@ export default function Sidebar() {
 
   const mainLinkClass = ({ isActive }) =>
     [
-      'flex items-center gap-3 px-3 py-2 rounded-md font-medium transition-all duration-200',
+      'flex items-center gap-2 px-3 py-1.25 rounded-md font-medium text-[15px] transition-colors duration-200',
       isActive
         ? 'bg-primary/15 dark:bg-primary/25 text-primary border-l-4 border-primary shadow-[var(--shadow-soft)]'
         : 'text-text-primary dark:text-text-light hover:bg-primary/10 hover:text-primary',
@@ -61,7 +61,7 @@ export default function Sidebar() {
 
   const subLinkClass = ({ isActive }) =>
     [
-      'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-all duration-200',
+      'flex items-center gap-2 px-3 py-1 rounded-md text-sm transition-all duration-200',
       isActive
         ? 'bg-primary/15 dark:bg-primary/25 text-primary border-l-4 border-primary font-semibold shadow-[var(--shadow-soft)]'
         : 'text-text-secondary dark:text-text-light/80 hover:bg-primary/10 hover:text-primary',
@@ -69,20 +69,24 @@ export default function Sidebar() {
 
   const parentClass = (active) =>
     [
-      'flex items-center justify-between px-3 py-2 rounded-md font-medium transition-all duration-200',
+      'flex items-center justify-between px-3 py-1.25 rounded-md font-medium text-[15px] transition-colors duration-200',
       active
         ? 'bg-primary/15 dark:bg-primary/25 text-primary border-l-4 border-primary shadow-[var(--shadow-soft)]'
         : 'text-text-primary dark:text-text-light hover:bg-primary/10 hover:text-primary',
     ].join(' ');
 
   const SectionTitle = ({ title }) => (
-    <div className="mt-4 mb-1 text-xs uppercase tracking-widest font-semibold flex items-center gap-2 text-text-secondary/60 dark:text-text-light/60">
+    <div
+      className={`${
+        isSidebarOpen ? 'mt-3 mb-1' : 'mt-4 mb-1'
+      } text-xs uppercase tracking-widest font-semibold flex items-center gap-2 text-text-secondary/60 dark:text-text-light/60`}
+    >
       {!sidebar && !hovered ? (
         <div className="w-full border-t border-primary/30" />
       ) : (
         <>
           <div className="flex-1 border-t border-primary/30" />
-          <span className="text-[11px]">{title}</span>
+          <Label className="text-[11px]">{title}</Label>
           <div className="flex-1 border-t border-primary/30" />
         </>
       )}
@@ -93,16 +97,20 @@ export default function Sidebar() {
   const [textVisible, setTextVisible] = useState(isSidebarOpen);
 
   useEffect(() => {
-    let timer;
-    if (isSidebarOpen) {
-      timer = setTimeout(() => setTextVisible(true), 120);
-    } else {
-      setTextVisible(false);
-    }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
+    setTextVisible(isSidebarOpen);
   }, [isSidebarOpen]);
+
+  const Label = ({ children, className = '' }) => (
+    <span
+      className={[
+        'flex-1 min-w-0 whitespace-nowrap overflow-hidden transition-opacity duration-100',
+        textVisible ? 'opacity-100' : 'opacity-0',
+        className,
+      ].join(' ')}
+    >
+      {children}
+    </span>
+  );
 
   return (
     <motion.aside
@@ -111,9 +119,9 @@ export default function Sidebar() {
       animate={{
         width: isSidebarOpen ? '250px' : '90px',
       }}
-      transition={{ duration: 0.1, ease: 'easeOut' }}
+      transition={{ duration: 0.22, ease: 'easeInOut' }}
       className={`
-        fixed top-0 left-0 z-30 h-screen p-4
+        fixed top-0 left-0 z-30 h-screen px-4 pb-4 pt-2
         bg-light-card dark:bg-dark-card
         border-r border-primary/10
         shadow-soft dark:shadow-strong
@@ -123,7 +131,7 @@ export default function Sidebar() {
       style={{ width: isSidebarOpen ? '250px' : '90px' }}
     >
       <div
-        className={`absolute -right-4 top-4 transition-opacity duration-300 ${
+        className={`absolute -right-4 top-2 transition-opacity duration-300 ${
           hovered ? 'opacity-100' : 'opacity-0'
         }`}
       >
@@ -135,35 +143,33 @@ export default function Sidebar() {
         />
       </div>
 
-      <div className="flex flex-col mb-5">
+      <div className="flex flex-col mb-4">
       <div className="flex items-center gap-2 px-2">
         <img src={logo} alt="UniMall" className="w-10 h-10 object-contain" />
-        {textVisible && (
-          <div className="flex">
-            <h1 className="text-2xl font-extrabold text-primary tracking-tight">Uni</h1>
-            <h1 className="text-2xl font-extrabold text-text-primary dark:text-text-light tracking-tight">
-              Mall
-            </h1>
-            </div>
-          )}
+        <Label className="flex">
+          <h1 className="text-2xl font-extrabold text-primary tracking-tight">Uni</h1>
+          <h1 className="text-2xl font-extrabold text-text-primary dark:text-text-light tracking-tight">
+            Mall
+          </h1>
+        </Label>
         </div>
-        <div className="h-0.5 rounded-full mt-3 bg-primary/30" />
+        <div className="h-0.5 rounded-full mt-2 bg-primary/30" />
       </div>
 
       <nav
-        className="sidebar-scroll flex flex-1 flex-col gap-2 overflow-y-scroll pr-1"
-        style={{ scrollbarWidth: 'thin', scrollbarColor: '#8dd4de transparent' }}
+        className="sidebar-scroll flex flex-1 flex-col gap-2 overflow-y-auto pr-2"
+        style={{ scrollbarWidth: 'thin', scrollbarColor: '#a5b4c4 transparent' }}
       >
         <NavLink to="/cpanel/dashboard" className={mainLinkClass}>
-          <FaChartPie className="text-lg" />
-          {textVisible && <span>Dashboard</span>}
+          <FaChartPie className="text-lg shrink-0" />
+          <Label>Dashboard</Label>
         </NavLink>
 
         <SectionTitle title="Products" />
         <button onClick={() => toggleMenu('products')} className={parentClass(isProductsActive)}>
           <div className="flex items-center gap-3">
-            <FaBox className="text-lg" />
-            {textVisible && <span>Products</span>}
+            <FaBox className="text-lg shrink-0" />
+            <Label>Products</Label>
           </div>
           {textVisible && (
             <IoIosArrowDown className={`transition-transform ${openMenus.products ? 'rotate-180' : ''}`} />
@@ -180,24 +186,24 @@ export default function Sidebar() {
               className="pl-9 flex flex-col gap-1"
             >
               <NavLink to="/cpanel/products/add" className={subLinkClass}>
-                <FaPlusCircle className="text-[13px]" /> Add Product
+                <FaPlusCircle className="text-[13px]" /> <Label>Add Product</Label>
               </NavLink>
               <NavLink to="/cpanel/products/list" className={subLinkClass}>
-                <FaList className="text-[13px]" /> Product Table
+                <FaList className="text-[13px]" /> <Label>Product List</Label>
               </NavLink>
             </motion.div>
           )}
         </AnimatePresence>
 
         <NavLink to="/cpanel/products/view" className={mainLinkClass}>
-          <FaThLarge className="text-lg" />
-          {textVisible && <span>View Products</span>}
+          <FaThLarge className="text-lg shrink-0" />
+          <Label>View Products</Label>
         </NavLink>
 
         <button onClick={() => toggleMenu('categories')} className={parentClass(isCategoriesActive)}>
           <div className="flex items-center gap-3">
-            <FaTags className="text-lg" />
-            {textVisible && <span>Categories</span>}
+            <FaTags className="text-lg shrink-0" />
+            <Label>Categories</Label>
           </div>
           {textVisible && (
             <IoIosArrowDown className={`transition-transform ${openMenus.categories ? 'rotate-180' : ''}`} />
@@ -214,34 +220,38 @@ export default function Sidebar() {
               className="pl-9 flex flex-col gap-1"
             >
               <NavLink to="/cpanel/categories/add" className={subLinkClass}>
-                <FaPlusCircle className="text-[13px]" /> Add Category
+                <FaPlusCircle className="text-[13px]" /> <Label>Add Category</Label>
               </NavLink>
               <NavLink to="/cpanel/categories/list" className={subLinkClass}>
-                <FaList className="text-[13px]" /> Category List
+                <FaList className="text-[13px]" /> <Label>Category List</Label>
               </NavLink>
             </motion.div>
           )}
         </AnimatePresence>
 
         <SectionTitle title="Sales" />
+        <NavLink to="/cpanel/pos" className={mainLinkClass}>
+          <FaStore className="text-lg shrink-0" />
+          <Label>POS</Label>
+        </NavLink>
         <NavLink to="/cpanel/orders" className={mainLinkClass}>
-          <FaShoppingBag className="text-lg" />
-          {textVisible && <span>Orders</span>}
+          <FaShoppingBag className="text-lg shrink-0" />
+          <Label>Orders</Label>
         </NavLink>
         <NavLink to="/cpanel/invoices" className={mainLinkClass}>
-          <FaFileInvoice className="text-lg" />
-          {textVisible && <span>Invoices</span>}
+          <FaFileInvoice className="text-lg shrink-0" />
+          <Label>Invoices</Label>
         </NavLink>
-        <NavLink to="/cpanel/reports" className={mainLinkClass}>
-          <FaChartLine className="text-lg" />
-          {textVisible && <span>Reports</span>}
+        <NavLink to="/cpanel/transactions" className={mainLinkClass}>
+          <FaExchangeAlt className="text-lg shrink-0" />
+          <Label>Transactions</Label>
         </NavLink>
 
         <SectionTitle title="Users" />
         <button onClick={() => toggleMenu('employees')} className={parentClass(isEmployeesActive)}>
           <div className="flex items-center gap-3">
-            <FaUserTie className="text-lg" />
-            {textVisible && <span>Employees</span>}
+            <FaUserTie className="text-lg shrink-0" />
+            <Label>Employees</Label>
           </div>
           {textVisible && (
             <IoIosArrowDown className={`transition-transform ${openMenus.employees ? 'rotate-180' : ''}`} />
@@ -258,32 +268,32 @@ export default function Sidebar() {
               className="pl-9 flex flex-col gap-1"
             >
               <NavLink to="/cpanel/employees/add" className={subLinkClass}>
-                <FaPlusCircle className="text-[13px]" /> Add Employee
+                <FaPlusCircle className="text-[13px]" /> <Label>Add Employee</Label>
               </NavLink>
               <NavLink to="/cpanel/employees/list" className={subLinkClass}>
-                <FaList className="text-[13px]" /> Employee List
+                <FaList className="text-[13px]" /> <Label>Employee List</Label>
               </NavLink>
             </motion.div>
           )}
         </AnimatePresence>
 
         <NavLink to="/cpanel/customers" className={mainLinkClass}>
-          <FaUsers className="text-lg" />
-          {textVisible && <span>Customers</span>}
+          <FaUsers className="text-lg shrink-0" />
+          <Label>Customers</Label>
         </NavLink>
 
-        <SectionTitle title="System" />
-        <NavLink to="/cpanel/announcements" className={mainLinkClass}>
-          <FaBullhorn className="text-lg" />
-          {textVisible && <span>Announcements</span>}
+        <SectionTitle title="Pages" />
+        <NavLink to="/cpanel/pages/home" className={mainLinkClass}>
+          <FaHome className="text-lg shrink-0" />
+          <Label>Home Page</Label>
         </NavLink>
-        <NavLink to="/cpanel/integrations" className={mainLinkClass}>
-          <FaCogs className="text-lg" />
-          {textVisible && <span>Integrations</span>}
+        <NavLink to="/cpanel/pages/about" className={mainLinkClass}>
+          <FaInfoCircle className="text-lg shrink-0" />
+          <Label>About Us Page</Label>
         </NavLink>
-        <NavLink to="/cpanel/help" className={mainLinkClass}>
-          <FaQuestionCircle className="text-lg" />
-          {textVisible && <span>Help Center</span>}
+        <NavLink to="/cpanel/pages/contact" className={mainLinkClass}>
+          <FaEnvelope className="text-lg shrink-0" />
+          <Label>Contact Us Page</Label>
         </NavLink>
       </nav>
     </motion.aside>

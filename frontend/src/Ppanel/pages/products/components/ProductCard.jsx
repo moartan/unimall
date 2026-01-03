@@ -1,13 +1,35 @@
-import { Bookmark, ShoppingCart, Eye, Star } from "lucide-react";
+import { Bookmark, ShoppingCart, Eye, Star, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useCart } from "../../../context/useCart.jsx";
 import { useWishlist } from "../../../context/useWishlist";
+import { useEffect, useMemo, useState } from "react";
 
 export default function ProductCard({ product, onQuickView }) {
   const { items = [], addItem, setQuantity } = useCart();
   const cartItem = items.find((i) => i.id === product.id);
   const { items: wishItems = [], addItem: addWish, removeItem: removeWish } = useWishlist() || {};
   const inWishlist = wishItems.some((w) => w.id === product.id || w.productId === product.id);
+  const [imageIdx, setImageIdx] = useState(0);
+
+  const gallery = useMemo(() => {
+    const list = Array.isArray(product.images) && product.images.length ? product.images : [product.image];
+    return list.filter(Boolean);
+  }, [product.image, product.images]);
+
+  useEffect(() => {
+    setImageIdx(0);
+  }, [product.id, product.image, product.images]);
+
+  const nextImage = () => {
+    setImageIdx((prev) => (gallery.length ? (prev + 1) % gallery.length : 0));
+  };
+
+  const prevImage = () => {
+    setImageIdx((prev) => {
+      if (!gallery.length) return 0;
+      return (prev - 1 + gallery.length) % gallery.length;
+    });
+  };
 
   const inc = () => {
     if (cartItem) {
@@ -25,12 +47,46 @@ export default function ProductCard({ product, onQuickView }) {
     }
   };
 
+  const imageSrc =
+    gallery[imageIdx] || "https://dummyimage.com/600x600/eff2f6/94a3b8&text=No+Image";
+
   return (
     <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden hover:shadow-md transition">
-      <div className="relative">
-        <div className="w-full h-56 bg-slate-100">
-          <img src={product.image} alt={product.title} className="w-full h-full object-cover" />
+      <div className="relative group">
+        <div className="w-full h-56 bg-slate-100 flex items-center justify-center">
+          <img
+            src={imageSrc}
+            alt={product.title}
+            className="w-full h-full object-contain p-3"
+            loading="lazy"
+          />
         </div>
+        {gallery.length > 1 ? (
+          <>
+            <button
+              type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              prevImage();
+            }}
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 text-slate-600 hover:text-primary shadow flex items-center justify-center opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition"
+              aria-label="Previous image"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              nextImage();
+            }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 text-slate-600 hover:text-primary shadow flex items-center justify-center opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition"
+              aria-label="Next image"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </>
+        ) : null}
         {product.badge && (
           <span className="absolute top-3 left-3 bg-white text-primary text-xs font-semibold px-3 py-1 rounded-full shadow-sm">
             {product.badge}

@@ -9,7 +9,8 @@ import VerifyEmail from '../pages/auth/VerifyEmail.jsx';
 import ConfirmEmailChange from '../pages/auth/ConfirmEmailChange.jsx';
 import Checkout from '../pages/checkout/Checkout.jsx';
 import Profile from '../pages/profile/Profile.jsx';
-import Orders from '../pages/orders/Orders.jsx';
+import ProfileAddressesPage from '../pages/profile/ProfileAddressesPage.jsx';
+import ProfileOrdersPage from '../pages/profile/ProfileOrdersPage.jsx';
 import Wishlist from '../pages/wishlist/Wishlist.jsx';
 import NotFound from '../pages/NotFound.jsx';
 import PublicPpanel from './PublicPpanel.jsx';
@@ -59,10 +60,26 @@ export default function PpanelRoutes() {
         }
       />
       <Route
+        path="addresses"
+        element={
+          <ProtectedPpanel>
+            <ProfileAddressesPage />
+          </ProtectedPpanel>
+        }
+      />
+      <Route
+        path="profile/orders"
+        element={
+          <ProtectedPpanel>
+            <ProfileOrdersPage />
+          </ProtectedPpanel>
+        }
+      />
+      <Route
         path="orders"
         element={
           <ProtectedPpanel>
-            <Orders />
+            <ProfileOrdersPage />
           </ProtectedPpanel>
         }
       />

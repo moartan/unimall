@@ -5,7 +5,7 @@ import ProductList from "../components/ProductList.jsx";
 import QuickViewModal from "../components/QuickViewModal.jsx";
 import { useCart } from "../../../context/useCart.jsx";
 import { useWishlist } from "../../../context/useWishlist";
-import { fetchProductDetail, fetchPublishedProducts } from "../../../api/catalog";
+import { fetchProductDetail, fetchPublishedProducts, trackProductView } from "../../../api/catalog";
 import useCanonical from "../../../../shared/seo/useCanonical.js";
 
 const mapProduct = (p) => ({
@@ -15,8 +15,8 @@ const mapProduct = (p) => ({
   category: p.category?.slug || p.category?.name || "uncategorized",
   categoryId: p.category?._id,
   stock: `${p.stock ?? 0} in stock`,
-  price: Number(p.currentPrice || 0),
-  originalPrice: p.originalPrice ? Number(p.originalPrice) : null,
+  price: Number(p.salePrice ?? p.price ?? p.currentPrice ?? 0),
+  originalPrice: p.regularPrice ? Number(p.regularPrice) : null,
   badge: p.isFeatured ? "Featured" : p.isPromoted ? "Promoted" : "",
   rating: Number(p.averageRating || 0),
   reviewCount: Number(p.reviewCount || p.ratingCount || 0),
@@ -59,6 +59,7 @@ export default function ProductDetails() {
         const res = await fetchProductDetail(slugOrId);
         const mapped = mapProduct(res.data?.product || {});
         setProduct(mapped);
+        trackProductView(slugOrId).catch(() => {});
         // Record recently viewed
         try {
           const key = "recent_products";

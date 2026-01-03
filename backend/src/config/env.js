@@ -52,7 +52,6 @@ const config = {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
     from: process.env.EMAIL_FROM || 'no-reply@unimall.com',
-    resendApiKey: process.env.RESEND_API_KEY,
   },
 };
 

@@ -3,14 +3,11 @@ import mongoose from 'mongoose';
 const orderItemSchema = new mongoose.Schema(
   {
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-    variantIndex: { type: Number, default: null },
     name: { type: String, required: true },
-    sku: { type: String, trim: true },
     quantity: { type: Number, required: true },
-    price: { type: Number, required: true },
-    originalPrice: { type: Number },
-    costPrice: { type: Number },
-    variantPrice: { type: Number },
+    price: { type: Number, required: true }, // sale price at time of order
+    regularPrice: { type: Number },
+    totalCost: { type: Number },
     image: { type: String },
     cancelledQty: { type: Number, default: 0 },
   },
@@ -63,7 +60,9 @@ orderSchema.pre('validate', function setCode(next) {
     const random = Math.random().toString(36).slice(2, 10).toUpperCase();
     this.orderCode = `ORD-${random}`;
   }
-  next();
+  if (typeof next === 'function') {
+    next();
+  }
 });
 
 const Order = mongoose.model('Order', orderSchema);

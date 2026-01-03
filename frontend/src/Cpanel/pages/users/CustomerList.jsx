@@ -1,25 +1,63 @@
-import { useMemo, useState } from 'react';
-import { FiSearch, FiMail, FiPhone, FiEye } from 'react-icons/fi';
-
-const mockCustomers = [
-  { id: 1, name: 'Mohamed Artan', email: 'mohamed@example.com', phone: '+252 90 123 4567', orders: 18, spent: 9794, status: 'Active', joined: '2024-03-01' },
-  { id: 2, name: 'Amina Warsame', email: 'amina@example.com', phone: '+252 61 234 5678', orders: 12, spent: 6240, status: 'Active', joined: '2024-05-12' },
-  { id: 3, name: 'Rahim Nur', email: 'rahim@example.com', phone: '+252 63 321 9999', orders: 6, spent: 1890, status: 'Blocked', joined: '2023-12-20' },
-  { id: 4, name: 'Lina Ahmed', email: 'lina@example.com', phone: '+252 90 456 7788', orders: 4, spent: 920, status: 'Active', joined: '2024-01-04' },
-  { id: 5, name: 'Carlos Pinto', email: 'carlos@example.com', phone: '+1 415 555 1234', orders: 9, spent: 3120, status: 'Active', joined: '2024-02-18' },
-];
+import { useEffect, useMemo, useState } from 'react';
+import { FiSearch, FiMail, FiPhone, FiEye, FiSlash, FiTrash2 } from 'react-icons/fi';
+import dayjs from 'dayjs';
+import { useCpanel } from '../../context/CpanelProvider';
+import { getCustomers } from '../../api/catalog';
 
 const statusTone = (status) => (status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700');
 
 export default function CustomerList() {
+  const { api, user } = useCpanel();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
-  const [customers, setCustomers] = useState(mockCustomers);
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchCustomers = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const { data } = await getCustomers(api, { limit: 200 });
+        if (!mounted) return;
+        setCustomers(
+          (data?.users || []).map((u) => ({
+            id: u._id,
+            name: u.name || '—',
+            email: u.email || '—',
+            phone: u.phone || '—',
+            status: u.status === 'block' ? 'Blocked' : 'Active',
+            joined: u.createdAt,
+            userCode: u.userCode || '—',
+            avatar: u.avatar?.url || u.profileImage?.url,
+            ordersCount: u.ordersCount || 0,
+            totalSpent: u.totalSpent || 0,
+            totalBenefit: u.totalBenefit || u.benefit || 0,
+          })),
+        );
+      } catch (err) {
+        if (mounted) setError(err?.response?.data?.message || 'Failed to load customers.');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    fetchCustomers();
+    return () => {
+      mounted = false;
+    };
+  }, [api]);
 
   const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
     return customers.filter((c) => {
-      const q = query.toLowerCase();
-      const matchesQuery = c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q) || c.phone.toLowerCase().includes(q);
+      const matchesQuery =
+        !q ||
+        [c.name, c.email, c.phone, c.userCode]
+          .filter(Boolean)
+          .some((field) => field.toLowerCase().includes(q));
       const matchesStatus = status === 'all' ? true : c.status.toLowerCase() === status;
       return matchesQuery && matchesStatus;
     });
@@ -29,15 +67,59 @@ export default function CustomerList() {
     const total = customers.length;
     const active = customers.filter((c) => c.status === 'Active').length;
     const blocked = customers.filter((c) => c.status === 'Blocked').length;
-    const ltv = customers.reduce((sum, c) => sum + c.spent, 0);
+    const ltv = customers.reduce((sum, c) => sum + (Number(c.totalSpent) || 0), 0);
     return { total, active, blocked, ltv };
   }, [customers]);
 
-  const toggleStatus = (id) => {
-    setCustomers((prev) =>
-      prev.map((c) =>
-        c.id === id ? { ...c, status: c.status === 'Active' ? 'Blocked' : 'Active' } : c
-      )
+  const handleToggleStatus = async (customer) => {
+    if (!user || user.employeeRole !== 'admin') {
+      alert('Only admins can change customer status.');
+      return;
+    }
+    const next = customer.status === 'Active' ? 'block' : 'active';
+    try {
+      await api.patch(`/cpanel/users/${customer.id}/status`, { status: next });
+      setCustomers((prev) =>
+        prev.map((c) => (c.id === customer.id ? { ...c, status: next === 'block' ? 'Blocked' : 'Active' } : c)),
+      );
+      if (selected?.id === customer.id) {
+        setSelected((prev) => ({ ...prev, status: next === 'block' ? 'Blocked' : 'Active' }));
+      }
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to update status.');
+    }
+  };
+
+  const handleDelete = async (customer) => {
+    if (!user || user.employeeRole !== 'admin') {
+      alert('Only admins can delete customers.');
+      return;
+    }
+    if (!window.confirm('Delete this customer permanently?')) return;
+    try {
+      await api.delete(`/cpanel/users/${customer.id}`);
+      setCustomers((prev) => prev.filter((c) => c.id !== customer.id));
+      if (selected?.id === customer.id) setSelected(null);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to delete customer.');
+    }
+  };
+
+  const renderAvatar = (customer) => {
+    if (customer.avatar) {
+      return <img src={customer.avatar} alt={customer.name} className="h-12 w-12 rounded-full object-cover" />;
+    }
+    const initials =
+      customer.name
+        ?.split(' ')
+        .map((n) => n[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase() || 'CU';
+    return (
+      <div className="h-12 w-12 rounded-full bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-lg">
+        {initials}
+      </div>
     );
   };
 
@@ -79,46 +161,89 @@ export default function CustomerList() {
             <thead className="bg-light-bg dark:bg-dark-hover text-text-secondary dark:text-text-light/70 uppercase text-[12px] tracking-wide">
               <tr>
                 <th className="text-left px-4 py-3">Customer</th>
-                <th className="text-left px-4 py-3">Orders</th>
-                <th className="text-left px-4 py-3">Total Spent</th>
+                <th className="text-left px-4 py-3">Email</th>
+                <th className="text-left px-4 py-3">Phone</th>
                 <th className="text-left px-4 py-3">Status</th>
                 <th className="text-left px-4 py-3">Joined</th>
                 <th className="text-right px-4 py-3">Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {filtered.map((c) => (
-                <tr key={c.id} className="border-t border-primary/10">
-                  <td className="px-4 py-4 text-text-primary dark:text-text-light">
-                    <div className="font-semibold">{c.name}</div>
-                    <div className="flex items-center gap-2 text-xs text-text-secondary dark:text-text-light/70">
-                      <FiMail /> {c.email}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-text-secondary dark:text-text-light/70">
-                      <FiPhone /> {c.phone}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 text-text-primary dark:text-text-light font-semibold">{c.orders}</td>
-                  <td className="px-4 py-4 text-text-primary dark:text-text-light font-semibold">${c.spent.toLocaleString()}</td>
-                  <td className="px-4 py-4">
-                    <button
-                      onClick={() => toggleStatus(c.id)}
-                      className={`px-3 py-1 rounded-full text-xs font-semibold ${statusTone(c.status)} transition`}
-                    >
-                      {c.status}
-                    </button>
-                  </td>
-                  <td className="px-4 py-4 text-text-secondary dark:text-text-light/70">
-                    {new Date(c.joined).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-4 text-right">
-                    <button className="p-2 rounded-lg border border-primary/15 text-text-secondary hover:bg-primary/10 transition">
-                      <FiEye />
-                    </button>
+            <tbody className="divide-y divide-primary/10">
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-6 text-center text-text-secondary dark:text-text-light/70">
+                    Loading customers...
                   </td>
                 </tr>
-              ))}
-              {filtered.length === 0 && (
+              ) : error ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-6 text-center text-red-600">
+                    {error}
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((c) => (
+                  <tr key={c.id} className="hover:bg-light-bg dark:hover:bg-dark-hover">
+                    <td className="px-4 py-4 text-text-primary dark:text-text-light">
+                      <div className="flex items-center gap-3">
+                        {renderAvatar(c)}
+                        <div>
+                          <div className="font-semibold text-[16px]">{c.name}</div>
+                          <div className="text-sm text-text-secondary dark:text-text-light/70">{c.userCode}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-text-primary dark:text-text-light">
+                      <div className="flex items-center gap-2">
+                        <FiMail className="text-text-secondary" /> {c.email}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-text-primary dark:text-text-light">
+                      <div className="flex items-center gap-2">
+                        <FiPhone className="text-text-secondary" /> {c.phone}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusTone(c.status)} transition`}>
+                        {c.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-text-secondary dark:text-text-light/70">
+                      {c.joined ? dayjs(c.joined).format('M/D/YYYY') : '—'}
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => setSelected(c)}
+                          className="p-2 rounded-lg border border-primary/15 text-text-secondary hover:bg-primary/10 transition"
+                          title="Quick view"
+                        >
+                          <FiEye />
+                        </button>
+                        {user?.employeeRole === 'admin' ? (
+                          <>
+                            <button
+                              onClick={() => handleToggleStatus(c)}
+                              className="p-2 rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 transition"
+                              title={c.status === 'Active' ? 'Block customer' : 'Activate customer'}
+                            >
+                              <FiSlash />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(c)}
+                              className="p-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition"
+                              title="Delete customer"
+                            >
+                              <FiTrash2 />
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+              {!loading && !error && filtered.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-6 text-center text-text-secondary dark:text-text-light/70">
                     No customers match your filters.
@@ -129,6 +254,76 @@ export default function CustomerList() {
           </table>
         </div>
       </div>
+
+      {selected ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold text-slate-500">CUSTOMER</p>
+                <h3 className="text-2xl font-bold text-slate-900">{selected.name}</h3>
+                <p className="text-sm text-slate-500">{selected.userCode}</p>
+              </div>
+              <button onClick={() => setSelected(null)} className="text-slate-500 hover:text-slate-800 text-xl">
+                ×
+              </button>
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className="space-y-2 text-sm text-slate-700">
+              <p className="flex items-center gap-2">
+                  <FiMail className="text-slate-400" />
+                  <span>{selected.email}</span>
+                </p>
+                <p className="flex items-center gap-2">
+                  <FiPhone className="text-slate-400" />
+                  <span>{selected.phone}</span>
+                </p>
+                <p>
+                  <span className="font-semibold">Status:</span>{' '}
+                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${statusTone(selected.status)}`}>
+                    {selected.status}
+                  </span>
+                </p>
+                <p>
+                  <span className="font-semibold">Joined:</span>{' '}
+                  {selected.joined ? dayjs(selected.joined).format('MMM D, YYYY') : '—'}
+                </p>
+              </div>
+              <div className="space-y-2 text-sm text-slate-700">
+                <p>
+                  <span className="font-semibold">Orders:</span> {selected.ordersCount ?? 0}
+                </p>
+                <p>
+                  <span className="font-semibold">Total Spent:</span>{' '}
+                  ${Number(selected.totalSpent || 0).toLocaleString()}
+                </p>
+                <p>
+                  <span className="font-semibold">Benefit to company:</span>{' '}
+                  ${Number(selected.totalBenefit || 0).toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            {user?.employeeRole === 'admin' ? (
+              <div className="mt-5 flex flex-wrap gap-3 justify-end">
+                <button
+                  onClick={() => handleToggleStatus(selected)}
+                  className="px-4 py-2 rounded-lg border border-primary/20 text-primary font-semibold hover:bg-primary/10 transition"
+                >
+                  {selected.status === 'Active' ? 'Block Customer' : 'Activate Customer'}
+                </button>
+                <button
+                  onClick={() => handleDelete(selected)}
+                  className="px-4 py-2 rounded-lg border border-red-200 text-red-600 font-semibold hover:bg-red-50 transition"
+                >
+                  Delete Customer
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

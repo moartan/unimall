@@ -1,113 +1,145 @@
-import { useMemo, useState } from 'react';
-import { FiSearch, FiEye, FiEdit2, FiFileText } from 'react-icons/fi';
-
-const mockOrders = [
-  {
-    id: '#INV-9043',
-    customer: 'Amina Warsame',
-    total: 299,
-    status: 'Paid',
-    fulfillment: 'Delivered',
-    paymentMethod: 'Cash on Delivery',
-    items: 3,
-    date: '2024-03-14',
-    channel: 'Storefront',
-  },
-  {
-    id: '#INV-9042',
-    customer: 'Jamal Yusuf',
-    total: 1249,
-    status: 'Shipped',
-    fulfillment: 'In transit',
-    paymentMethod: 'Card',
-    items: 5,
-    date: '2024-03-13',
-    channel: 'Marketplace',
-  },
-  {
-    id: '#INV-9041',
-    customer: 'Lina Ahmed',
-    total: 86,
-    status: 'Pending',
-    fulfillment: 'Awaiting',
-    paymentMethod: 'Card',
-    items: 1,
-    date: '2024-03-13',
-    channel: 'Storefront',
-  },
-  {
-    id: '#INV-9040',
-    customer: 'Carlos Pinto',
-    total: 449,
-    status: 'Paid',
-    fulfillment: 'Delivered',
-    paymentMethod: 'Cash on Delivery',
-    items: 2,
-    date: '2024-03-12',
-    channel: 'Social',
-  },
-  {
-    id: '#INV-9039',
-    customer: 'Muna Abdi',
-    total: 189,
-    status: 'Cancelled',
-    fulfillment: 'Cancelled',
-    paymentMethod: 'Card',
-    items: 2,
-    date: '2024-03-12',
-    channel: 'Storefront',
-  },
-  {
-    id: '#INV-9038',
-    customer: 'Rahim Nur',
-    total: 729,
-    status: 'Shipped',
-    fulfillment: 'In transit',
-    paymentMethod: 'Card',
-    items: 4,
-    date: '2024-03-11',
-    channel: 'POS',
-  },
-];
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useCpanel } from '../../context/CpanelProvider';
+import { getOrders } from '../../api/catalog';
+import OrderFilters from './components/OrderFilters';
+import OrderTabsBar from './components/OrderTabsBar';
+import OrderRow from './components/OrderRow';
+import { orderTabs, deriveStage } from './components/tabs';
+import { buildOrdersKey, getOrdersCache, setOrdersCache } from './components/cache';
+import LoadingSkeletonRows from './components/LoadingSkeletonRows';
+import OrderQuickView from './components/OrderQuickView';
 
 const statusBadge = (status) => {
-  switch (status) {
-    case 'Paid':
+  const value = (status || '').toLowerCase();
+  switch (value) {
+    case 'paid':
       return 'bg-emerald-100 text-emerald-700';
-    case 'Shipped':
+    case 'shipped':
       return 'bg-blue-100 text-blue-700';
-    case 'Pending':
+    case 'pending':
       return 'bg-amber-100 text-amber-700';
+    case 'refunded':
+      return 'bg-sky-100 text-sky-700';
     default:
       return 'bg-rose-100 text-rose-700';
   }
 };
 
 export default function Orders() {
+  const { api } = useCpanel();
   const [query, setQuery] = useState('');
-  const [status, setStatus] = useState('all');
   const [channel, setChannel] = useState('all');
   const [payment, setPayment] = useState('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialParam = searchParams.get('tab') || 'all';
+  const initialTab = orderTabs.find((t) => t.key === initialParam)?.key || 'all';
+  const [tab, setTab] = useState(initialTab);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selected, setSelected] = useState(null);
+
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const params = { limit: 500 };
+        const cacheKey = buildOrdersKey(params);
+        const cached = getOrdersCache(cacheKey);
+        if (cached) {
+          setOrders(cached);
+        }
+
+        const { data } = await getOrders(api, params);
+        const list = (data?.orders || []).map((o) => ({
+          id: o._id,
+          orderCode: o.orderCode,
+          customer: o.user?.name || '—',
+          customerEmail: o.user?.email || '—',
+          total: o.grandTotal ?? o.subtotal ?? 0,
+          paymentStatus: o.paymentStatus || 'pending',
+          fulfillmentStatus: o.fulfillmentStatus || 'pending',
+          paymentMethod: o.transactionId || 'Online',
+          items: o.items?.length || 0,
+          itemDetails: o.items || [],
+          channel: 'Online',
+          createdAt: o.createdAt,
+          updatedAt: o.updatedAt,
+          deliveredAt: o.deliveredAt,
+          deliveredBy: o.fulfilledBy?.name || o.updatedBy?.name || o.updatedBy || '—',
+          invoiceId: o.invoiceId || o.invoiceCode || null,
+        }));
+        setOrders(list);
+        setOrdersCache(cacheKey, list);
+      } catch (err) {
+        setError(err?.response?.data?.message || 'Failed to load orders');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOrders();
+  }, [api]);
 
   const filtered = useMemo(() => {
-    return mockOrders.filter((o) => {
+    return orders.filter((o) => {
       const q = query.toLowerCase();
-      const matchesQuery = o.id.toLowerCase().includes(q) || o.customer.toLowerCase().includes(q);
-      const matchesStatus = status === 'all' ? true : o.status.toLowerCase() === status;
-      const matchesChannel = channel === 'all' ? true : o.channel.toLowerCase() === channel;
+      const matchesQuery =
+        o.orderCode?.toLowerCase().includes(q) ||
+        o.customer?.toLowerCase().includes(q) ||
+        o.customerEmail?.toLowerCase().includes(q);
+      const stage = deriveStage(o);
+      const matchesTab = tab === 'all' ? true : stage === tab;
+      const matchesChannel = channel === 'all' ? true : (o.channel || '').toLowerCase() === channel;
       const matchesPayment =
-        payment === 'all' ? true : o.paymentMethod.toLowerCase().includes(payment);
-      return matchesQuery && matchesStatus && matchesChannel && matchesPayment;
+        payment === 'all'
+          ? true
+          : (o.paymentMethod || '').toLowerCase().includes(payment) ||
+            (o.paymentStatus || '').toLowerCase().includes(payment);
+      return matchesQuery && matchesTab && matchesChannel && matchesPayment;
     });
-  }, [query, status, channel, payment]);
+  }, [orders, query, tab, channel, payment]);
 
   const stats = useMemo(() => {
-    const total = mockOrders.length;
-    const awaiting = mockOrders.filter((o) => o.status === 'Pending').length;
-    const delivered = mockOrders.filter((o) => o.fulfillment?.toLowerCase().includes('delivered')).length;
-    const revenue = mockOrders.reduce((sum, o) => sum + o.total, 0);
+    const total = orders.length;
+    const awaiting = orders.filter((o) => deriveStage(o) === 'awaiting-payment').length;
+    const delivered = orders.filter((o) => deriveStage(o) === 'delivered').length;
+    const revenue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
     return { total, awaiting, delivered, revenue };
-  }, []);
+  }, [orders]);
+
+  const resetFilters = () => {
+    setQuery('');
+    setPayment('all');
+    setChannel('all');
+    setTab('all');
+    const next = new URLSearchParams(searchParams);
+    next.delete('tab');
+    setSearchParams(next);
+  };
+
+  const handleTabChange = (nextTab) => {
+    setTab(nextTab);
+    const next = new URLSearchParams(searchParams);
+    if (nextTab === 'all') next.delete('tab');
+    else next.set('tab', nextTab);
+    setSearchParams(next);
+  };
+
+  const isDeliveredView = tab === 'delivered';
+  const showInvoiceColumn = tab === 'delivered' || tab === 'return-refund';
+
+  const columnsCount = (() => {
+    if (isDeliveredView) return showInvoiceColumn ? 9 : 8;
+    if (tab === 'awaiting-fulfillment' || tab === 'shipped-transit') return 7;
+    if (tab === 'return-refund') return showInvoiceColumn ? 9 : 8;
+    return 8;
+  })();
 
   return (
     <div className="space-y-4">
@@ -119,52 +151,18 @@ export default function Orders() {
       </div>
 
       <div className="rounded-2xl border border-primary/10 bg-light-card dark:bg-dark-card shadow-soft dark:shadow-strong">
-        <div className="flex flex-col md:flex-row gap-3 p-4 border-b border-primary/10">
-          <div className="flex items-center gap-2 flex-1 rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2">
-            <FiSearch className="text-text-secondary" />
-            <input
-              type="text"
-              placeholder="Search by order code, customer, or phone..."
-              className="w-full bg-transparent focus:outline-none text-sm text-text-primary dark:text-text-light"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
+        <OrderFilters
+          query={query}
+          onQueryChange={setQuery}
+          payment={payment}
+          onPaymentChange={setPayment}
+          channel={channel}
+          onChannelChange={setChannel}
+          onReset={resetFilters}
+        />
 
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 text-sm text-text-primary dark:text-text-light"
-          >
-            <option value="all">All statuses</option>
-            <option value="paid">Paid</option>
-            <option value="shipped">Shipped</option>
-            <option value="pending">Pending</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-
-          <select
-            value={payment}
-            onChange={(e) => setPayment(e.target.value)}
-            className="rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 text-sm text-text-primary dark:text-text-light"
-          >
-            <option value="all">All payments</option>
-            <option value="cash">Cash</option>
-            <option value="card">Card</option>
-            <option value="delivery">Delivery</option>
-          </select>
-
-          <select
-            value={channel}
-            onChange={(e) => setChannel(e.target.value)}
-            className="rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 text-sm text-text-primary dark:text-text-light"
-          >
-            <option value="all">All sources</option>
-            <option value="storefront">Storefront</option>
-            <option value="marketplace">Marketplace</option>
-            <option value="social">Social</option>
-            <option value="pos">POS</option>
-          </select>
+        <div className="pb-3">
+          <OrderTabsBar tabs={orderTabs} active={tab} onChange={handleTabChange} />
         </div>
 
         <div className="overflow-x-auto">
@@ -176,63 +174,59 @@ export default function Orders() {
                 <th className="text-left px-4 py-3">Items</th>
                 <th className="text-left px-4 py-3">Total</th>
                 <th className="text-left px-4 py-3">Payment</th>
-                <th className="text-left px-4 py-3">Fulfillment</th>
-                <th className="text-left px-4 py-3">Updated</th>
-                <th className="text-right px-4 py-3">Actions</th>
+                {isDeliveredView ? (
+                  <>
+                    <th className="text-left px-4 py-3">Order Date</th>
+                    <th className="text-left px-4 py-3">Delivered Date</th>
+                    {showInvoiceColumn ? <th className="text-left px-4 py-3">Invoice</th> : null}
+                    <th className="text-left px-4 py-3">Delivered By</th>
+                  </>
+                ) : tab === 'awaiting-fulfillment' ? (
+                  <>
+                    <th className="text-left px-4 py-3">Order Date</th>
+                    <th className="text-left px-4 py-3">Last Update</th>
+                  </>
+                ) : tab === 'shipped-transit' ? (
+                  <>
+                    <th className="text-left px-4 py-3">Order Date</th>
+                    <th className="text-left px-4 py-3">Last Update</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="text-left px-4 py-3">Fulfillment</th>
+                    <th className="text-left px-4 py-3">Updated</th>
+                    {showInvoiceColumn ? <th className="text-left px-4 py-3">Invoice</th> : null}
+                    <th className="text-right px-4 py-3">Actions</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((order) => (
-                <tr key={order.id} className="border-t border-primary/10">
-                  <td className="px-4 py-4 font-semibold text-text-primary dark:text-text-light">
-                    <div>{order.id}</div>
-                    <div className="text-xs text-text-secondary dark:text-text-light/70">
-                      {new Date(order.date).toLocaleDateString()}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 text-text-primary dark:text-text-light">
-                    <div className="font-semibold">{order.customer}</div>
-                    <div className="text-xs text-text-secondary dark:text-text-light/70">customer@example.com</div>
-                  </td>
-                  <td className="px-4 py-4 text-text-primary dark:text-text-light">
-                    <div className="font-semibold">{order.items} items</div>
-                    <div className="text-xs text-text-secondary dark:text-text-light/70">{order.channel}</div>
-                  </td>
-                  <td className="px-4 py-4 text-text-primary dark:text-text-light font-semibold">
-                    ${order.total.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-4 text-text-primary dark:text-text-light">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadge(order.status)}`}>
-                      {order.status}
-                    </span>
-                    <div className="text-xs text-text-secondary dark:text-text-light/70 mt-1">{order.paymentMethod}</div>
-                  </td>
-                  <td className="px-4 py-4 text-text-primary dark:text-text-light">
-                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-                      {order.fulfillment}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4 text-text-secondary dark:text-text-light/70">
-                    {new Date(order.date).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button className="p-2 rounded-lg border border-primary/15 text-text-secondary hover:bg-primary/10 transition" title="View">
-                        <FiEye />
-                      </button>
-                      <button className="p-2 rounded-lg border border-primary/15 text-text-secondary hover:bg-primary/10 transition" title="Invoice">
-                        <FiFileText />
-                      </button>
-                      <button className="p-2 rounded-lg border border-primary/15 text-text-secondary hover:bg-primary/10 transition" title="Edit">
-                        <FiEdit2 />
-                      </button>
-                    </div>
+              {loading ? (
+                <LoadingSkeletonRows rows={6} />
+              ) : error ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-6 text-center text-red-600">
+                    {error}
                   </td>
                 </tr>
-              ))}
-              {filtered.length === 0 && (
+              ) : (
+                filtered.map((order, idx) => (
+                  <OrderRow
+                    key={order.id}
+                    order={order}
+                    idx={idx}
+                    statusBadge={statusBadge}
+                    isDeliveredView={isDeliveredView}
+                    tab={tab}
+                    showInvoiceColumn={showInvoiceColumn}
+                    onView={() => setSelected(order)}
+                  />
+                ))
+              )}
+              {!loading && !error && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-6 text-center text-text-secondary dark:text-text-light/70">
+                  <td colSpan={columnsCount} className="px-4 py-6 text-center text-text-secondary dark:text-text-light/70">
                     No orders match your filters.
                   </td>
                 </tr>
@@ -241,6 +235,9 @@ export default function Orders() {
           </table>
         </div>
       </div>
+      {selected ? (
+        <OrderQuickView order={selected} onClose={() => setSelected(null)} />
+      ) : null}
     </div>
   );
 }

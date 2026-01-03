@@ -3,13 +3,11 @@ import mongoose from 'mongoose';
 const cartItemSchema = new mongoose.Schema(
   {
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-    variantIndex: { type: Number, default: null },
     quantity: { type: Number, default: 1 },
     priceSnapshot: {
-      currentPrice: { type: Number },
-      originalPrice: { type: Number },
-      costPrice: { type: Number },
-      variantPrice: { type: Number },
+      salePrice: { type: Number },
+      regularPrice: { type: Number },
+      totalCost: { type: Number },
     },
     addedAt: { type: Date, default: Date.now },
   },

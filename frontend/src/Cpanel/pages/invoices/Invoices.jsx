@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { FiSearch, FiEye, FiDownload, FiEdit2 } from 'react-icons/fi';
 
 const invoices = [
@@ -11,6 +12,7 @@ const invoices = [
     due: '2025-11-21',
     items: 4,
     source: 'Web',
+    products: ['NovaBook Air 14', 'Aurora Buds X'],
   },
   {
     id: '#INV-2047',
@@ -21,6 +23,7 @@ const invoices = [
     due: '2025-11-18',
     items: 3,
     source: 'Web',
+    products: ['ZenNote 15'],
   },
   {
     id: '#INV-2046',
@@ -31,6 +34,7 @@ const invoices = [
     due: '2025-11-22',
     items: 2,
     source: 'POS',
+    products: ['Pulse Mini Speaker'],
   },
   {
     id: '#INV-2045',
@@ -41,6 +45,7 @@ const invoices = [
     due: '2025-11-05',
     items: 1,
     source: 'Marketplace',
+    products: ['Aurora Buds X'],
   },
   {
     id: '#INV-2044',
@@ -51,6 +56,7 @@ const invoices = [
     due: '2025-11-10',
     items: 5,
     source: 'Storefront',
+    products: ['Galaxy One Pro'],
   },
 ];
 
@@ -67,20 +73,47 @@ const statusTone = (status) => {
   }
 };
 
+const tabs = [
+  { key: 'all', label: 'All' },
+  { key: 'product', label: 'Product Match' },
+  { key: 'refund', label: 'Refund/Cancel' },
+  { key: 'due', label: 'Overdue' },
+];
+
 export default function Invoices() {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
   const [source, setSource] = useState('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = tabs.find((t) => t.key === searchParams.get('tab'))?.key || 'all';
+  const [tab, setTab] = useState(initialTab);
+
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
 
   const filtered = useMemo(() => {
     return invoices.filter((inv) => {
       const q = query.toLowerCase();
-      const matchesQuery = inv.id.toLowerCase().includes(q) || inv.customer.toLowerCase().includes(q);
+      const matchesQuery =
+        inv.id.toLowerCase().includes(q) ||
+        inv.customer.toLowerCase().includes(q) ||
+        inv.products?.some((p) => p.toLowerCase().includes(q));
       const matchesStatus = status === 'all' ? true : inv.status.toLowerCase() === status;
       const matchesSource = source === 'all' ? true : inv.source.toLowerCase() === source;
-      return matchesQuery && matchesStatus && matchesSource;
+      const matchesTab =
+        tab === 'all'
+          ? true
+          : tab === 'product'
+            ? inv.products?.some((p) => p.toLowerCase().includes(q))
+            : tab === 'refund'
+              ? ['overdue', 'cancelled', 'refunded'].includes(inv.status.toLowerCase())
+              : tab === 'due'
+                ? inv.status.toLowerCase() === 'overdue'
+                : true;
+      return matchesQuery && matchesStatus && matchesSource && matchesTab;
     });
-  }, [query, status, source]);
+  }, [query, status, source, tab]);
 
   const stats = useMemo(() => {
     const paid = invoices.filter((i) => i.status === 'Paid').length;
@@ -102,41 +135,69 @@ export default function Invoices() {
       </div>
 
       <div className="rounded-2xl border border-primary/10 bg-light-card dark:bg-dark-card shadow-soft dark:shadow-strong">
-        <div className="flex flex-col md:flex-row gap-3 p-4 border-b border-primary/10">
-          <div className="flex items-center gap-2 flex-1 rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2">
-            <FiSearch className="text-text-secondary" />
-            <input
-              type="text"
-              placeholder="Search by invoice code or customer..."
-              className="w-full bg-transparent focus:outline-none text-sm text-text-primary dark:text-text-light"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
+        <div className="p-4 border-b border-primary/10 flex flex-col gap-3">
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="flex items-center gap-2 flex-1 rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2">
+              <FiSearch className="text-text-secondary" />
+              <input
+                type="text"
+                placeholder="Search by invoice code or customer..."
+                className="w-full bg-transparent focus:outline-none text-sm text-text-primary dark:text-text-light"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 text-sm text-text-primary dark:text-text-light"
+              >
+                <option value="all">All status</option>
+                <option value="draft">Draft</option>
+                <option value="sent">Sent</option>
+                <option value="paid">Paid</option>
+                <option value="overdue">Overdue</option>
+              </select>
+
+              <select
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+                className="rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 text-sm text-text-primary dark:text-text-light"
+              >
+                <option value="all">All sources</option>
+                <option value="web">Web</option>
+                <option value="storefront">Storefront</option>
+                <option value="marketplace">Marketplace</option>
+                <option value="pos">POS</option>
+              </select>
+            </div>
           </div>
 
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 text-sm text-text-primary dark:text-text-light"
-          >
-            <option value="all">All status</option>
-            <option value="draft">Draft</option>
-            <option value="sent">Sent</option>
-            <option value="paid">Paid</option>
-            <option value="overdue">Overdue</option>
-          </select>
-
-          <select
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-            className="rounded-lg border border-primary/20 bg-light-bg dark:bg-dark-bg px-3 py-2 text-sm text-text-primary dark:text-text-light"
-          >
-            <option value="all">All sources</option>
-            <option value="web">Web</option>
-            <option value="storefront">Storefront</option>
-            <option value="marketplace">Marketplace</option>
-            <option value="pos">POS</option>
-          </select>
+          <div className="pb-1 -mx-4">
+            <div className="flex items-center gap-2 overflow-x-auto bg-[#f5f8fb] px-2 py-2 w-full">
+            {tabs.map((t) => {
+              const isActive = tab === t.key;
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => {
+                    setTab(t.key);
+                    setSearchParams(t.key === 'all' ? {} : { tab: t.key });
+                  }}
+                  className={`whitespace-nowrap px-3 pb-2 pt-1 transition text-sm font-semibold border-b-2 ${
+                    isActive
+                      ? 'text-primary border-primary'
+                      : 'text-text-secondary border-transparent hover:text-text-primary hover:border-primary/40'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+            </div>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -154,7 +215,7 @@ export default function Invoices() {
             </thead>
             <tbody>
               {filtered.map((inv) => (
-                <tr key={inv.id} className="border-t border-primary/10">
+                <tr key={inv.id} className="border-t border-primary/10 hover:bg-primary/5">
                   <td className="px-4 py-4 font-semibold text-text-primary dark:text-text-light">
                     <div>{inv.id}</div>
                     <div className="text-xs text-text-secondary dark:text-text-light/70">{inv.source}</div>

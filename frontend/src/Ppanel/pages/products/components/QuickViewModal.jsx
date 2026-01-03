@@ -1,5 +1,7 @@
 import { Bookmark, ShoppingCart, Star, X } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useEffect } from "react";
+import { trackProductView } from "../../../api/catalog";
 
 export default function QuickViewModal({ product, related, onClose }) {
   if (!product) return null;
@@ -9,6 +11,13 @@ export default function QuickViewModal({ product, related, onClose }) {
     : product.id
       ? `/collections/view/${product.id}`
       : "/collections";
+
+  useEffect(() => {
+    if (!product) return;
+    const idOrSlug = product.slug || product.id;
+    if (!idOrSlug) return;
+    trackProductView(idOrSlug).catch(() => {});
+  }, [product]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">

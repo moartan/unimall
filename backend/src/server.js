@@ -96,6 +96,7 @@ app.use('/customer/wishlist', customerWishlistRoutes);
 app.use('/customer/cart', customerCartRoutes);
 app.use('/customer/orders', customerOrderRoutes);
 app.use('/employee/orders', employeeOrderRoutes);
+app.use('/employee/media', employeeMediaRoutes);
 
 app.get('/csrf-token', (req, res) => {
   res.json({ csrfToken: req.csrfToken() });

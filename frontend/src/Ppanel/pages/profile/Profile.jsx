@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Home, UserCircle2, KeyRound, LogOut, MapPin, ChevronDown } from "lucide-react";
 import { usePpanel } from "../../context/PpanelProvider";
 import Overview from "./Overview";
 import EditProfile from "./EditProfile";
 import AvatarSection from "./ProfileImageSection";
 import SecuritySection from "./SecuritySection";
-import AddressesSection from "./AddressesSection";
 import EmailVerificationSection from "./EmailVerificationSection";
-import SmsTwoFASection from "./SmsTwoFASection";
+import ProfileShell from "./ProfileShell";
 // Sessions removed per request
 
 export default function Profile() {
@@ -33,7 +31,6 @@ export default function Profile() {
   const [avatarMsg, setAvatarMsg] = useState({ error: "", success: "" });
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
-  const [navOpen, setNavOpen] = useState(true);
 
   const displayName = useMemo(() => user?.name || user?.fullName || user?.email || "", [user]);
 
@@ -61,16 +58,6 @@ export default function Profile() {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
-
-  useEffect(() => {
-    const handle = () => {
-      const isMobile = window.innerWidth < 1024;
-      setNavOpen(!isMobile);
-    };
-    handle();
-    window.addEventListener("resize", handle);
-    return () => window.removeEventListener("resize", handle);
-  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -148,150 +135,76 @@ export default function Profile() {
   };
 
   return (
-    <div className="w-full max-w-[1280px] mx-auto py-10 space-y-8">
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
-        <aside className="bg-white rounded-3xl shadow-md border border-slate-100 p-6 flex flex-col items-stretch gap-5">
-          <button
-            className="lg:hidden flex items-center justify-between w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 text-slate-800 font-semibold"
-            onClick={() => setNavOpen((v) => !v)}
-          >
-            <span className="flex items-center gap-2">
-              <span className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center text-lg font-bold">
-                {(displayName || "U").slice(0, 2).toUpperCase()}
-              </span>
-              Profile
-            </span>
-            <ChevronDown
-              size={18}
-              className={`transition ${navOpen ? "rotate-180" : ""}`}
-            />
-          </button>
+    <ProfileShell
+      user={user}
+      displayName={displayName}
+      activeKey={activeTab}
+      onSelectTab={(tabKey) => {
+        setActiveTab(tabKey);
+        setSearchParams({ tab: tabKey });
+      }}
+      logout={logout}
+    >
+      {activeTab === "overview" && <Overview user={user} displayName={displayName} />}
 
-          {navOpen && (
-            <>
-              <div className="flex flex-col items-center text-center gap-2">
-                <div className="w-20 h-20 rounded-full bg-primary text-white flex items-center justify-center text-3xl font-bold">
-                  {(displayName || "U")
-                    .split(/\s+/)
-                    .filter(Boolean)
-                    .map((part) => part[0])
-                    .join("")
-                    .slice(0, 2)
-                    .toUpperCase()}
-                </div>
-                <div>
-                  <p className="text-lg font-semibold text-slate-900">{displayName}</p>
-                  <p className="text-sm text-slate-600">{user?.email}</p>
-                </div>
-              </div>
+      {activeTab === "details" && (
+        <EditProfile
+          form={form}
+          onChange={handleChange}
+          onReset={() => {
+            if (user) {
+              setForm({
+                name: user.name || "",
+                email: user.email || "",
+                country: user.country || "",
+                phone: user.phone || "",
+                gender: user.gender || "",
+              });
+            }
+            setError("");
+            setSuccess("");
+          }}
+          onSubmit={handleSave}
+          saving={saving}
+          success={success}
+          error={error}
+        />
+      )}
 
-              <div className="flex flex-col gap-2">
-                {[
-                  { key: "overview", label: "Overview", icon: <Home size={18} /> },
-                  { key: "details", label: "Edit Profile", icon: <UserCircle2 size={18} /> },
-                  { key: "avatar", label: "Profile Image", icon: <UserCircle2 size={18} /> },
-                  { key: "security", label: "Security", icon: <KeyRound size={18} /> },
-                  { key: "addresses", label: "Addresses", icon: <MapPin size={18} /> },
-                  { key: "email", label: "Email & Verification", icon: <UserCircle2 size={18} /> },
-                  { key: "sms", label: "SMS & 2FA", icon: <KeyRound size={18} /> },
-                ].map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => {
-                      setActiveTab(tab.key);
-                      setSearchParams({ tab: tab.key });
-                    }}
-                    className={`w-full text-left px-4 py-3 rounded-xl font-semibold transition border flex items-center gap-3 ${
-                      activeTab === tab.key
-                        ? "bg-primary text-white border-primary shadow-sm"
-                        : "bg-slate-50 text-slate-700 border-slate-200 hover:border-primary/60"
-                    }`}
-                  >
-                    <span className="shrink-0">{tab.icon}</span>
-                    <span>{tab.label}</span>
-                  </button>
-                ))}
-              </div>
+      {activeTab === "avatar" && (
+        <AvatarSection
+          user={user}
+          displayName={displayName}
+          avatarPreview={avatarPreview}
+          onFileChange={(file) => {
+            setAvatarFile(file || null);
+            setAvatarPreview(file ? URL.createObjectURL(file) : "");
+            setAvatarMsg({ error: "", success: "" });
+          }}
+          onRemove={() => {
+            setAvatarFile(null);
+            setAvatarPreview("");
+            setAvatarMsg({ error: "", success: "" });
+          }}
+          onSubmit={handleAvatarUpload}
+          avatarFile={avatarFile}
+          loading={avatarLoading}
+          msg={avatarMsg}
+        />
+      )}
 
-              <button
-                onClick={logout}
-                className="w-full text-left px-4 py-3 rounded-xl font-semibold transition border flex items-center gap-3 bg-slate-50 text-slate-700 border-slate-200 hover:border-red-400 hover:text-red-600"
-              >
-                <LogOut size={18} />
-                <span>Logout</span>
-              </button>
-            </>
-          )}
-        </aside>
+      {activeTab === "security" && (
+        <SecuritySection
+          pwdForm={pwdForm}
+          onChange={setPwdForm}
+          onSubmit={handlePasswordChange}
+          saving={pwdSaving}
+          msg={pwdMsg}
+        />
+      )}
 
-        <div className="space-y-5">
-          {activeTab === "overview" && <Overview user={user} displayName={displayName} />}
+      {activeTab === "email" && <EmailVerificationSection user={user} api={api} setUser={setUser} />}
 
-          {activeTab === "details" && (
-            <EditProfile
-              form={form}
-              onChange={handleChange}
-              onReset={() => {
-                if (user) {
-                  setForm({
-                    name: user.name || "",
-                    email: user.email || "",
-                    country: user.country || "",
-                    phone: user.phone || "",
-                    gender: user.gender || "",
-                  });
-                }
-                setError("");
-                setSuccess("");
-              }}
-              onSubmit={handleSave}
-              saving={saving}
-              success={success}
-              error={error}
-            />
-          )}
-
-          {activeTab === "avatar" && (
-            <AvatarSection
-              user={user}
-              displayName={displayName}
-              avatarPreview={avatarPreview}
-              onFileChange={(file) => {
-                setAvatarFile(file || null);
-                setAvatarPreview(file ? URL.createObjectURL(file) : "");
-                setAvatarMsg({ error: "", success: "" });
-              }}
-              onRemove={() => {
-                setAvatarFile(null);
-                setAvatarPreview("");
-                setAvatarMsg({ error: "", success: "" });
-              }}
-              onSubmit={handleAvatarUpload}
-              avatarFile={avatarFile}
-              loading={avatarLoading}
-              msg={avatarMsg}
-            />
-          )}
-
-          {activeTab === "security" && (
-            <SecuritySection
-              pwdForm={pwdForm}
-              onChange={setPwdForm}
-              onSubmit={handlePasswordChange}
-              saving={pwdSaving}
-              msg={pwdMsg}
-            />
-          )}
-
-          {activeTab === "addresses" && <AddressesSection />}
-
-          {activeTab === "email" && (
-            <EmailVerificationSection user={user} api={api} setUser={setUser} />
-          )}
-
-          {activeTab === "sms" && <SmsTwoFASection />}
-        </div>
-      </div>
-    </div>
+    </ProfileShell>
   );
 }

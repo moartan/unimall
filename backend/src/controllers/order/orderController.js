@@ -23,19 +23,15 @@ const recomputeTotalsFromOrder = (order) => {
 };
 
 const mapCartItemToOrderItem = (product, cartItem) => {
-  const variant = cartItem.variantIndex !== null && product.variants ? product.variants[cartItem.variantIndex] : null;
-  const price = variant?.price || product.currentPrice;
+  const price = product.salePrice;
   return {
     product: product._id,
-    variantIndex: cartItem.variantIndex,
     name: product.name,
-    sku: variant?.sku || product.sku,
     quantity: cartItem.quantity,
     price,
-    originalPrice: product.originalPrice,
-    costPrice: product.costPrice,
-    variantPrice: variant?.price,
-    image: variant?.images?.[0]?.url || product.images?.[0]?.url,
+    regularPrice: product.regularPrice,
+    totalCost: product.totalCost,
+    image: product.images?.[0]?.url,
   };
 };
 
@@ -46,12 +42,7 @@ const restockItems = async (items) => {
   for (const item of items) {
     const product = map.get(item.product.toString());
     if (!product) continue;
-    if (item.variantIndex !== null && product.variants && product.variants[item.variantIndex]) {
-      const variant = product.variants[item.variantIndex];
-      if (variant.stock !== undefined) variant.stock += item.quantity;
-    } else {
-      product.stock += item.quantity;
-    }
+    product.stock += item.quantity;
     await product.save();
   }
 };
@@ -100,12 +91,7 @@ export const createOrderFromCart = async (req, res, next) => {
     for (const item of cart.items) {
       const product = productMap.get(item.product.toString());
       if (!product) throw createError(400, 'Product unavailable');
-      const variant =
-        item.variantIndex !== null && product.variants ? product.variants[item.variantIndex] : null;
-      if (variant && variant.stock !== undefined && variant.stock < item.quantity && !variant.allowBackorder) {
-        throw createError(400, `Insufficient stock for ${product.name}`);
-      }
-      if (!variant && product.stock < item.quantity) {
+      if (product.stock < item.quantity) {
         throw createError(400, `Insufficient stock for ${product.name}`);
       }
       orderItems.push(mapCartItemToOrderItem(product, item));
@@ -124,14 +110,7 @@ export const createOrderFromCart = async (req, res, next) => {
     // deduct stock
     for (const item of orderItems) {
       const product = productMap.get(item.product.toString());
-      if (item.variantIndex !== null && product.variants) {
-        const variant = product.variants[item.variantIndex];
-        if (variant && variant.stock !== undefined) {
-          variant.stock = Math.max(0, variant.stock - item.quantity);
-        }
-      } else {
-        product.stock = Math.max(0, product.stock - item.quantity);
-      }
+      product.stock = Math.max(0, product.stock - item.quantity);
       await product.save();
     }
 
@@ -305,7 +284,7 @@ export const cancelMyOrder = async (req, res, next) => {
 export const cancelOrderItems = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { items } = req.body; // [{productId, variantIndex, quantity}]
+    const { items } = req.body; // [{productId, quantity}]
     if (!Array.isArray(items) || items.length === 0) throw createError(400, 'Items required');
     const order = await Order.findById(id);
     if (!order) throw createError(404, 'Order not found');
@@ -314,18 +293,14 @@ export const cancelOrderItems = async (req, res, next) => {
     }
     const restockList = [];
     for (const cancelItem of items) {
-      const { productId, variantIndex = null, quantity } = cancelItem;
+      const { productId, quantity } = cancelItem;
       if (!productId || !quantity || quantity < 1) throw createError(400, 'Invalid item payload');
-      const orderItem = order.items.find(
-        (i) =>
-          i.product.toString() === productId &&
-          ((i.variantIndex === null && variantIndex === null) || i.variantIndex === variantIndex)
-      );
+      const orderItem = order.items.find((i) => i.product.toString() === productId);
       if (!orderItem) throw createError(404, 'Order item not found');
       const remaining = orderItem.quantity - (orderItem.cancelledQty || 0);
       if (quantity > remaining) throw createError(400, 'Cancel quantity exceeds remaining');
       orderItem.cancelledQty = (orderItem.cancelledQty || 0) + quantity;
-      restockList.push({ product: orderItem.product, variantIndex, quantity });
+      restockList.push({ product: orderItem.product, quantity });
     }
     recomputeTotalsFromOrder(order);
     await order.save();
@@ -333,7 +308,6 @@ export const cancelOrderItems = async (req, res, next) => {
     await restockItems(
       restockList.map((i) => ({
         product: i.product,
-        variantIndex: i.variantIndex,
         quantity: i.quantity,
       }))
     );

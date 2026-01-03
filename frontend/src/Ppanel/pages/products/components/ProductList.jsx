@@ -7,6 +7,25 @@ export default function ProductList({ products, onQuickView, view, loading }) {
   const { items = [], addItem, setQuantity } = useCart();
   const { items: wishItems = [], addItem: addWish, removeItem: removeWish } = useWishlist() || {};
 
+  const adsPriorityScore = (product) => {
+    const badge = product.badge?.toLowerCase?.() || "";
+    if (product.isExclusive || badge === "exclusive") return 0;
+    if (product.isFeatured || badge === "featured") return 1;
+    return 2;
+  };
+
+  const orderedProducts =
+    view === "list" && Array.isArray(products)
+      ? [...products]
+          .map((p, idx) => ({ p, idx }))
+          .sort((a, b) => {
+            const diff = adsPriorityScore(a.p) - adsPriorityScore(b.p);
+            if (diff !== 0) return diff;
+            return a.idx - b.idx;
+          })
+          .map(({ p }) => p)
+      : products;
+
   const renderQtyControls = (product) => {
     const cartItem = items.find((i) => i.id === product.id);
     const inc = () => (cartItem ? setQuantity(cartItem, cartItem.quantity + 1) : addItem(product, 1));
@@ -106,13 +125,18 @@ export default function ProductList({ products, onQuickView, view, loading }) {
   if (view === "list") {
     return (
       <div className="space-y-4">
-        {products.map((product) => (
+        {orderedProducts.map((product) => (
           <div
             key={product.id}
             className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden hover:shadow-md transition flex flex-col lg:flex-row"
           >
-            <div className="w-full lg:w-64 h-52 bg-slate-100 flex-shrink-0">
-              <img src={product.image} alt={product.title} className="w-full h-full object-cover" />
+            <div className="w-full lg:w-64 h-52 bg-slate-100 flex-shrink-0 flex items-center justify-center">
+              <img
+                src={product.image || "https://dummyimage.com/600x600/eff2f6/94a3b8&text=No+Image"}
+                alt={product.title}
+                className="w-full h-full object-contain p-3"
+                loading="lazy"
+              />
             </div>
             <div className="flex-1 p-4 lg:p-5">
               <div className="flex items-center gap-2 text-xs text-slate-500">

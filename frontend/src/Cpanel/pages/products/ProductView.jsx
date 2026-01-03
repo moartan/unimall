@@ -1,15 +1,22 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { FaThLarge } from 'react-icons/fa';
 import { FiList } from 'react-icons/fi';
-import ProductGrid from './ProductGrid';
-import ProductList from './ProductList';
+import ProductGrid from './components/ProductGrid';
+import ProductList from './components/ProductListView';
 
 export default function ProductView() {
-  const [view, setView] = useState('grid');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialView = searchParams.get('view') || 'grid';
+  const [view, setView] = useState(initialView);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState('-createdAt');
   const [meta, setMeta] = useState({ totalPages: 1, page: 1 });
   const activeFilters = useMemo(() => ({}), []);
+
+  useEffect(() => {
+    setView(initialView);
+  }, [initialView]);
 
   const toggleClass = (active) =>
     [
@@ -33,7 +40,10 @@ export default function ProductView() {
           <div className="flex rounded-full border border-primary/25 bg-white dark:bg-dark-card shadow-soft overflow-hidden">
             <button
               type="button"
-              onClick={() => setView('grid')}
+              onClick={() => {
+                setView('grid');
+                setSearchParams({ view: 'grid' });
+              }}
               className={toggleClass(view === 'grid')}
             >
               <FaThLarge className="text-[14px]" />
@@ -41,7 +51,10 @@ export default function ProductView() {
             </button>
             <button
               type="button"
-              onClick={() => setView('list')}
+              onClick={() => {
+                setView('list');
+                setSearchParams({ view: 'list' });
+              }}
               className={toggleClass(view === 'list')}
             >
               <FiList className="text-[14px]" />
@@ -60,8 +73,8 @@ export default function ProductView() {
               className="bg-transparent text-text-primary dark:text-text-light outline-none"
             >
               <option value="-createdAt">Featured</option>
-              <option value="-currentPrice">Price: High to Low</option>
-              <option value="currentPrice">Price: Low to High</option>
+              <option value="-salePrice">Price: High to Low</option>
+              <option value="salePrice">Price: Low to High</option>
               <option value="name">Name: A-Z</option>
               <option value="-name">Name: Z-A</option>
             </select>

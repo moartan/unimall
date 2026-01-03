@@ -12,5 +12,8 @@ export const fetchPublishedProducts = (params = {}) => {
 export const fetchProductDetail = (idOrSlug) =>
   baseClient.get(`/catalog/products/${idOrSlug}`);
 
+export const trackProductView = (idOrSlug) =>
+  baseClient.post(`/catalog/products/${idOrSlug}/view`);
+
 export const fetchCategories = (params = {}) =>
   baseClient.get('/catalog/categories', { params: { status: 'Active', ...params } });

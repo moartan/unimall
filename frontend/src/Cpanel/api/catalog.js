@@ -13,8 +13,11 @@ export const createProduct = (api, payload) =>
 export const updateProduct = (api, idOrSlug, payload) =>
   api.put(`/employee/products/${idOrSlug}`, payload);
 
-export const deleteProduct = (api, idOrSlug) =>
-  api.delete(`/employee/products/${idOrSlug}`);
+export const deleteProduct = (api, idOrSlug, permanent = false) =>
+  api.delete(`/employee/products/${idOrSlug}${permanent ? '?permanent=true' : ''}`);
+
+export const restoreProduct = (api, idOrSlug) =>
+  api.post(`/employee/products/${idOrSlug}/restore`);
 
 export const getCategories = (api, params = {}) =>
   api.get('/employee/categories', { params });
@@ -30,6 +33,17 @@ export const updateCategory = (api, id, payload) =>
 
 export const deleteCategory = (api, id) =>
   api.delete(`/employee/categories/${id}`);
+
+export const updateProductPriority = (api, id, displayPriority) =>
+  api.patch(`/employee/products/${id}/priority`, { displayPriority });
+
+// Admin: customers
+export const getCustomers = (api, params = {}) =>
+  api.get('/cpanel/customers', { params });
+
+// Employee: orders
+export const getOrders = (api, params = {}) =>
+  api.get('/employee/orders', { params });
 
 export const uploadProductImages = (api, files = []) => {
   const formData = new FormData();

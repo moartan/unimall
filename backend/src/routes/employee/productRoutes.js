@@ -8,9 +8,7 @@ import {
   softDeleteProduct,
   listDeletedProducts,
   restoreProduct,
-  addVariant,
-  updateVariant,
-  deleteVariant,
+  updateDisplayPriority,
 } from '../../controllers/catalog/productController.js';
 const router = express.Router();
 
@@ -21,10 +19,8 @@ router.get('/deleted/list', requireEmployeeRoles('admin'), listDeletedProducts);
 router.get('/:idOrSlug', getProduct);
 router.post('/', createProduct);
 router.put('/:idOrSlug', updateProduct);
+router.patch('/:id/priority', requireEmployeeRoles('admin', 'staff'), updateDisplayPriority);
 router.delete('/:idOrSlug', requireEmployeeRoles('admin'), softDeleteProduct);
 router.post('/:idOrSlug/restore', requireEmployeeRoles('admin'), restoreProduct);
-router.post('/:id/variants', addVariant);
-router.put('/:id/variants/:variantIndex', updateVariant);
-router.delete('/:id/variants/:variantIndex', deleteVariant);
 
 export default router;
