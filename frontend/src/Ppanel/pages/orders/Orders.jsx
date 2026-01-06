@@ -1,196 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Check, Circle, Clock, Package, Truck, XCircle, CheckCircle2, Loader2, Timer, FileDown, Search } from "lucide-react";
-
-const mockOrders = [
-  {
-    id: "#1125",
-    status: "in_progress",
-    placedAt: "May 11, 2024",
-    eta: "ETA May 19, 2024",
-    price: "$213.00",
-    items: 2,
-    payment: "Cash on Delivery",
-    orderedAgo: "2 mins ago",
-    shippingTo: "Hodan Ali · Riverside Dr, Nairobi",
-    tax: 0,
-    delivery: 0,
-    invoiceUrl: "#",
-    itemsList: [
-      {
-        title: "Samsung Galaxy S24 Ultra",
-        subtitle: "256GB · Titanium Gray",
-        price: "$1299.99",
-        qty: 1,
-        image: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=400&q=80",
-      },
-      {
-        title: "Anker GaNPrime 65W Charger",
-        subtitle: "Dual USB-C",
-        price: "$59.99",
-        qty: 1,
-        image: "https://images.unsplash.com/photo-1502877828070-33b167ad6860?auto=format&fit=crop&w=400&q=80",
-      },
-      {
-        title: "Spigen Ultra Hybrid Case",
-        subtitle: "Matte Clear",
-        price: "$69.99",
-        qty: 1,
-        image: "https://images.unsplash.com/photo-1580915411980-d1425ea2f0f2?auto=format&fit=crop&w=400&q=80",
-      },
-    ],
-    steps: [
-      { label: "Confirmed", done: true },
-      { label: "Preparing", done: true },
-      { label: "Picked up", done: false },
-      { label: "Delivered", done: false },
-    ],
-  },
-  {
-    id: "#1126",
-    status: "in_progress",
-    placedAt: "May 12, 2024",
-    eta: "ETA May 20, 2024",
-    price: "$149.00",
-    items: 1,
-    payment: "Card",
-    orderedAgo: "10 mins ago",
-    shippingTo: "Hodan Ali · Mbagathi Rd, Nairobi",
-    tax: 0,
-    delivery: 0,
-    invoiceUrl: "#",
-    itemsList: [
-      {
-        title: "Logitech MX Anywhere 3S",
-        subtitle: "Graphite",
-        price: "$89.50",
-        qty: 1,
-        image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=400&q=80",
-      },
-    ],
-    steps: [
-      { label: "Confirmed", done: true },
-      { label: "Preparing", done: false },
-      { label: "Picked up", done: false },
-      { label: "Delivered", done: false },
-    ],
-  },
-  {
-    id: "#1127",
-    status: "complete",
-    placedAt: "Apr 22, 2024",
-    deliveredAt: "Apr 27, 2024",
-    price: "$89.00",
-    items: 3,
-    payment: "Cash on Delivery",
-    orderedAgo: "1 day ago",
-    shippingTo: "Hodan Ali · Riverside Dr, Nairobi",
-    tax: 0,
-    delivery: 0,
-    invoiceUrl: "#",
-    itemsList: [
-      {
-        title: "Sony WH-1000XM5",
-        subtitle: "Midnight Black",
-        price: "$329.99",
-        qty: 1,
-        image: "https://images.unsplash.com/photo-1583394838336-acd977736f90?auto=format&fit=crop&w=400&q=80",
-      },
-    ],
-    steps: [
-      { label: "Confirmed", done: true },
-      { label: "Preparing", done: true },
-      { label: "Picked up", done: true },
-      { label: "Delivered", done: true },
-    ],
-  },
-  {
-    id: "#1128",
-    status: "complete",
-    placedAt: "Apr 18, 2024",
-    deliveredAt: "Apr 23, 2024",
-    price: "$59.00",
-    items: 1,
-    payment: "Card",
-    orderedAgo: "2 days ago",
-    shippingTo: "Hodan Ali · Riverside Dr, Nairobi",
-    tax: 0,
-    delivery: 0,
-    invoiceUrl: "#",
-    itemsList: [
-      {
-        title: "Kindle Paperwhite",
-        subtitle: "11th gen",
-        price: "$129.00",
-        qty: 1,
-        image: "https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?auto=format&fit=crop&w=400&q=80",
-      },
-    ],
-    steps: [
-      { label: "Confirmed", done: true },
-      { label: "Preparing", done: true },
-      { label: "Picked up", done: true },
-      { label: "Delivered", done: true },
-    ],
-  },
-  {
-    id: "#1129",
-    status: "cancelled",
-    placedAt: "Mar 3, 2024",
-    cancelledAt: "Mar 3, 2024",
-    price: "$120.00",
-    items: 1,
-    payment: "Cash on Delivery",
-    orderedAgo: "3 hours ago",
-    shippingTo: "Hodan Ali · Kilimani, Nairobi",
-    tax: 0,
-    delivery: 0,
-    invoiceUrl: "#",
-    itemsList: [
-      {
-        title: "Apple AirPods Pro (2nd gen)",
-        subtitle: "USB-C",
-        price: "$249.00",
-        qty: 1,
-        image: "https://images.unsplash.com/photo-1585386959984-a4155224a1ad?auto=format&fit=crop&w=400&q=80",
-      },
-    ],
-    steps: [
-      { label: "Confirmed", done: true },
-      { label: "Preparing", done: false },
-      { label: "Picked up", done: false },
-      { label: "Delivered", done: false },
-    ],
-  },
-  {
-    id: "#1130",
-    status: "pending",
-    placedAt: "May 15, 2024",
-    price: "$75.00",
-    items: 1,
-    payment: "Card",
-    orderedAgo: "5 mins ago",
-    eta: "Awaiting confirmation",
-    shippingTo: "Hodan Ali · Nairobi",
-    tax: 0,
-    delivery: 0,
-    invoiceUrl: "#",
-    itemsList: [
-      {
-        title: "Anker 313 Power Bank",
-        subtitle: "10,000 mAh",
-        price: "$59.99",
-        qty: 1,
-        image: "https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?auto=format&fit=crop&w=400&q=80",
-      },
-    ],
-    steps: [
-      { label: "Confirmed", done: false },
-      { label: "Preparing", done: false },
-      { label: "Picked up", done: false },
-      { label: "Delivered", done: false },
-    ],
-  },
-];
+import { usePpanel } from "../../context/PpanelProvider";
 
 const tabs = [
   { key: "all", label: "All orders", icon: <Package size={14} /> },
@@ -208,13 +19,129 @@ const statusCopy = {
 };
 
 export default function Orders() {
+  const { api, accessToken, loading: authLoading } = usePpanel();
+  const [orders, setOrders] = useState([]);
   const [tab, setTab] = useState("all");
   const [modalOrder, setModalOrder] = useState(null);
   const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!accessToken) {
+      setOrders([]);
+      setLoadError("Please sign in to view your orders.");
+      return;
+    }
+
+    let isMounted = true;
+
+    const mapApiOrderToView = (o) => {
+      const fmt = (num) => `$${Number(num || 0).toFixed(2)}`;
+      const status = (() => {
+        switch (o.status) {
+          case "delivered":
+          case "return":
+            return "complete";
+          case "canceled":
+            return "cancelled";
+          case "pending":
+            return "pending";
+          case "request":
+          case "confirm":
+          case "preparing":
+          case "in_transit":
+          default:
+            return "in_progress";
+        }
+      })();
+      const steps = [
+        { label: "Confirmed", done: ["confirm", "preparing", "in_transit", "delivered", "return", "canceled"].includes(o.status) || o.status === "pending" },
+        { label: "Preparing", done: ["preparing", "in_transit", "delivered", "return"].includes(o.status) },
+        { label: "In transit", done: ["in_transit", "delivered", "return"].includes(o.status) },
+        { label: "Delivered", done: o.status === "delivered" || o.status === "return" },
+      ];
+      const itemsList = Array.isArray(o.items)
+        ? o.items.map((item) => ({
+            title: item.name,
+            subtitle: `Qty ${item.quantity}`,
+            price: fmt(item.price),
+            qty: item.quantity,
+            image: item.image,
+          }))
+        : [];
+      const address = o.address
+        ? `${o.address.name ? `${o.address.name} · ` : ""}${o.address.line1 || ""}${o.address.city ? `, ${o.address.city}` : ""}${
+            o.address.country ? `, ${o.address.country}` : ""
+          }`
+        : "";
+      return {
+        id: o.orderCode || o._id,
+        status,
+        placedAt: o.createdAt ? new Date(o.createdAt).toLocaleDateString() : undefined,
+        deliveredAt: o.deliveredAt ? new Date(o.deliveredAt).toLocaleDateString() : undefined,
+        createdAt: o.createdAt || null,
+        eta: o.status === "delivered" ? "Delivered" : undefined,
+        price: fmt(o.grandTotal),
+        tax: o.taxTotal || 0,
+        delivery: o.shippingTotal || 0,
+        items: itemsList.length,
+        payment: o.paymentStatus ? o.paymentStatus : "Card",
+        orderedAgo: "",
+        shippingTo: address || undefined,
+        invoiceUrl: "#",
+        itemsList,
+        updates: [],
+        steps,
+      };
+    };
+
+    const fetchOrders = async () => {
+      setLoading(true);
+      try {
+        const res = await api.get("/customer/orders");
+        const data = res.data || {};
+        const parseTime = (value) => {
+          const ts = value ? new Date(value).getTime() : NaN;
+          return Number.isFinite(ts) ? ts : null;
+        };
+        const list = Array.isArray(data.orders)
+          ? data.orders
+              .map((order, idx) => ({
+                ...mapApiOrderToView(order),
+                _idx: idx,
+                _ts: parseTime(order.createdAt),
+              }))
+              .sort((a, b) => {
+                if (a._ts != null && b._ts != null) return b._ts - a._ts; // newest first
+                if (a._ts != null) return -1;
+                if (b._ts != null) return 1;
+                return 0; // preserve API order when timestamps missing
+              })
+              .map(({ _idx, _ts, ...order }) => order)
+          : [];
+        if (isMounted) setOrders(list);
+        if (isMounted) setLoadError("");
+      } catch (err) {
+        if (isMounted) {
+          setOrders([]);
+          setLoadError("Could not load your orders. Please ensure you are signed in.");
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchOrders();
+    return () => {
+      isMounted = false;
+    };
+  }, [api, accessToken, authLoading]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    const base = tab === "all" ? mockOrders : mockOrders.filter((o) => o.status === tab);
+    const base = tab === "all" ? orders : orders.filter((o) => o.status === tab);
     if (!normalized) return base;
     return base.filter((o) => {
       const idMatch = o.id?.toLowerCase().includes(normalized);
@@ -226,10 +153,10 @@ export default function Orders() {
       );
       return idMatch || itemMatch;
     });
-  }, [tab, query]);
+  }, [tab, query, orders]);
 
   const counts = useMemo(() => {
-    return mockOrders.reduce(
+    return orders.reduce(
       (acc, order) => {
         acc.total += 1;
         acc[order.status] = (acc[order.status] || 0) + 1;
@@ -237,7 +164,7 @@ export default function Orders() {
       },
       { total: 0 },
     );
-  }, []);
+  }, [orders]);
 
   return (
     <div className="min-h-screen">
@@ -310,6 +237,33 @@ export default function Orders() {
         </div>
 
         <div className="space-y-4">
+          {loading && (
+            <div className="bg-white rounded-2xl border border-[#e3e8ef] shadow-sm p-10 text-center text-sm text-[#6a7589]">
+              Loading your orders...
+            </div>
+          )}
+
+          {!loading && filtered.length === 0 && (
+            <div className="bg-white rounded-2xl border border-[#e3e8ef] shadow-sm p-10 text-center space-y-3">
+              <p className="text-lg font-semibold text-[#1f2a44]">
+                {loadError ? "We couldn't load your orders" : "No orders yet"}
+              </p>
+              <p className="text-sm text-[#6a7589]">
+                {loadError
+                  ? "Please check your login session and try again."
+                  : "Looks like you haven&apos;t placed any orders. Ready to find something you like?"}
+              </p>
+              {!loadError && (
+                <Link
+                  to="/products"
+                  className="inline-flex items-center justify-center h-10 px-4 rounded-full bg-primary text-white text-sm font-semibold hover:bg-primary-hover transition"
+                >
+                  Browse products
+                </Link>
+              )}
+            </div>
+          )}
+
           {filtered.map((order, idx) => (
             <div
               key={`${order.id}-${idx}`}
@@ -432,12 +386,6 @@ export default function Orders() {
               </div>
             </div>
           ))}
-
-          {!filtered.length && (
-            <div className="bg-white rounded-2xl border border-[#e3e8ef] shadow-sm p-10 text-center text-sm text-[#6a7589]">
-              No orders in this tab yet.
-            </div>
-          )}
         </div>
       </div>
 

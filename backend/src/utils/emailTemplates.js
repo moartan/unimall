@@ -13,7 +13,7 @@ export const orderStatusTemplate = (order) =>
   <div style="font-family: Arial, sans-serif; color:#222;">
     <h2>Status Update</h2>
     <p>Order: <strong>${order.orderCode}</strong></p>
-    <p>Status: <strong>${order.fulfillmentStatus}</strong></p>
+    <p>Status: <strong>${order.status}</strong></p>
   </div>
 `;
 

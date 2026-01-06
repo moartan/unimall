@@ -64,7 +64,7 @@ export default function Orders() {
           customerEmail: o.user?.email || '—',
           total: o.grandTotal ?? o.subtotal ?? 0,
           paymentStatus: o.paymentStatus || 'pending',
-          fulfillmentStatus: o.fulfillmentStatus || 'pending',
+          status: o.status || 'request',
           paymentMethod: o.transactionId || 'Online',
           items: o.items?.length || 0,
           itemDetails: o.items || [],

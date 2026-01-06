@@ -11,17 +11,17 @@ export const orderTabs = [
 
 export const deriveStage = (order) => {
   if (order.stage) return order.stage;
-  const payment = (order.paymentStatus || order.status || '').toLowerCase();
-  const fulfill = (order.fulfillmentStatus || order.fulfillment || '').toLowerCase();
+  const payment = (order.paymentStatus || '').toLowerCase();
+  const status = (order.status || '').toLowerCase();
 
   if (payment.includes('fail') || payment.includes('hold')) return 'failed';
-  if (fulfill.includes('cancel')) return 'cancelled';
-  if (fulfill.includes('return') || fulfill === 'refund_requested') return 'return-refund';
-  if (fulfill === 'delivered') return 'delivered';
-  if (fulfill === 'shipped') return 'shipped-transit';
-  if (fulfill.includes('out') || fulfill.includes('delivery')) return 'shipped-transit';
-  if (fulfill === 'processing') return 'awaiting-fulfillment';
-  if (fulfill === 'pending') return payment !== 'paid' ? 'awaiting-payment' : 'awaiting-fulfillment';
+  if (status === 'canceled') return 'cancelled';
+  if (status === 'return') return 'return-refund';
+  if (status === 'delivered') return 'delivered';
+  if (status === 'in_transit') return 'shipped-transit';
+  if (status === 'preparing') return 'awaiting-fulfillment';
+  if (status === 'confirm' || status === 'request') return payment === 'paid' ? 'awaiting-fulfillment' : 'awaiting-payment';
+  if (status === 'pending') return payment === 'paid' ? 'awaiting-fulfillment' : 'awaiting-payment';
   if (payment && payment !== 'paid') return 'awaiting-payment';
   return 'awaiting-fulfillment';
 };

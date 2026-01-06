@@ -45,7 +45,7 @@ export default function OrderQuickView({ order, onClose }) {
                 {order.paymentStatus || '—'}
               </span>
               <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
-                {order.fulfillmentStatus || '—'}
+                {order.status || '—'}
               </span>
             </div>
 

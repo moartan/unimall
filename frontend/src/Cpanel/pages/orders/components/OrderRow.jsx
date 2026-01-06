@@ -19,10 +19,11 @@ const formatPayment = (value) => {
 const fulfillmentTone = (status) => {
   const v = (status || '').toLowerCase();
   if (v === 'delivered') return 'bg-emerald-100 text-emerald-700';
-  if (v === 'shipped') return 'bg-blue-100 text-blue-700';
-  if (v === 'processing') return 'bg-amber-100 text-amber-700';
-  if (v === 'returned' || v === 'refund_requested') return 'bg-purple-100 text-purple-700';
-  if (v === 'cancelled') return 'bg-rose-100 text-rose-700';
+  if (v === 'in_transit') return 'bg-blue-100 text-blue-700';
+  if (v === 'preparing') return 'bg-amber-100 text-amber-700';
+  if (v === 'return') return 'bg-purple-100 text-purple-700';
+  if (v === 'canceled') return 'bg-rose-100 text-rose-700';
+  if (v === 'confirm' || v === 'request' || v === 'pending') return 'bg-slate-100 text-slate-700';
   return 'bg-slate-100 text-slate-700';
 };
 
@@ -91,8 +92,8 @@ export default function OrderRow({ order, idx, statusBadge, isDeliveredView = fa
       ) : (
         <>
           <td className="px-4 py-4 text-text-primary dark:text-text-light">
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${fulfillmentTone(order.fulfillmentStatus || order.fulfillment)}`}>
-              {(order.fulfillmentStatus || order.fulfillment || '—').toLowerCase()}
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${fulfillmentTone(order.status)}`}>
+              {(order.status || '—').toLowerCase()}
             </span>
           </td>
           <td className="px-4 py-4 text-text-secondary dark:text-text-light/70">

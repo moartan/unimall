@@ -57,13 +57,14 @@ const sendCustomerEmail = async (user, subject, html) => {
 };
 
 const allowedTransitions = {
-  pending: ['processing', 'cancelled'],
-  processing: ['shipped', 'cancelled'],
-  shipped: ['delivered', 'cancelled', 'returned', 'refund_requested'],
-  delivered: ['returned', 'refund_requested'],
-  refund_requested: ['returned', 'cancelled'],
-  returned: [],
-  cancelled: [],
+  request: ['confirm', 'pending', 'canceled'],
+  confirm: ['preparing', 'pending', 'canceled'],
+  preparing: ['in_transit', 'pending'],
+  in_transit: ['delivered', 'pending'],
+  delivered: ['return'],
+  return: [],
+  pending: ['preparing', 'confirm', 'request', 'canceled'],
+  canceled: [],
 };
 
 const assertTransition = (current, next) => {
@@ -105,6 +106,8 @@ export const createOrderFromCart = async (req, res, next) => {
       ...totals,
       address,
       notes,
+      status: 'request',
+      requestedAt: new Date(),
     });
 
     // deduct stock
@@ -174,27 +177,30 @@ export const listAllOrders = async (req, res, next) => {
 export const updateOrderStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { paymentStatus, fulfillmentStatus } = req.body;
+    const { paymentStatus, status: nextStatus } = req.body;
     const order = await Order.findById(id);
     if (!order) throw createError(404, 'Order not found');
-    const prevStatus = order.fulfillmentStatus;
-    assertTransition(prevStatus, fulfillmentStatus);
+    const prevStatus = order.status;
+    assertTransition(prevStatus, nextStatus);
     if (paymentStatus) order.paymentStatus = paymentStatus;
-    if (fulfillmentStatus) {
-      order.fulfillmentStatus = fulfillmentStatus;
-      if (fulfillmentStatus === 'delivered') order.deliveredAt = new Date();
-      if (fulfillmentStatus === 'cancelled') order.cancelledAt = new Date();
-      if (fulfillmentStatus === 'returned') order.returnedAt = new Date();
-      if (fulfillmentStatus === 'refund_requested') order.refundRequestedAt = new Date();
-      // restock on cancelled or returned transitions (only once)
-      if ((fulfillmentStatus === 'cancelled' || fulfillmentStatus === 'returned') && prevStatus !== fulfillmentStatus) {
+    if (nextStatus) {
+      order.status = nextStatus;
+      const now = new Date();
+      if (nextStatus === 'confirm') order.confirmedAt = now;
+      if (nextStatus === 'preparing') order.preparedAt = now;
+      if (nextStatus === 'in_transit') order.inTransitAt = now;
+      if (nextStatus === 'delivered') order.deliveredAt = now;
+      if (nextStatus === 'canceled') order.cancelledAt = now;
+      if (nextStatus === 'return') order.refundRequestedAt = now;
+      // restock on canceled transitions (only once)
+      if (nextStatus === 'canceled' && prevStatus !== 'canceled') {
         await restockItems(order.items);
       }
     }
     await order.save();
     await notify(order.user, {
       title: 'Order status updated',
-      body: `Order ${order.orderCode} status: ${fulfillmentStatus || order.fulfillmentStatus}`,
+      body: `Order ${order.orderCode} status: ${nextStatus || order.status}`,
       metadata: { orderId: order._id },
     });
     const customer = await User.findById(order.user);
@@ -214,12 +220,12 @@ export const requestRefund = async (req, res, next) => {
     const { id } = req.params;
     const order = await Order.findOne({ _id: id, user: req.user._id });
     if (!order) throw createError(404, 'Order not found');
-    if (order.fulfillmentStatus !== 'delivered') throw createError(400, 'Order not delivered');
+    if (order.status !== 'delivered') throw createError(400, 'Order not delivered');
     if (!order.deliveredAt) throw createError(400, 'Delivered date missing');
     const now = Date.now();
     const diffHours = (now - order.deliveredAt.getTime()) / (1000 * 60 * 60);
     if (diffHours > 72) throw createError(400, 'Refund window expired');
-    order.fulfillmentStatus = 'refund_requested';
+    order.status = 'return';
     order.refundRequestedAt = new Date();
     await order.save();
     // notify employees
@@ -250,13 +256,13 @@ export const cancelMyOrder = async (req, res, next) => {
     const { id } = req.params;
     const order = await Order.findOne({ _id: id, user: req.user._id });
     if (!order) throw createError(404, 'Order not found');
-    if (!['pending', 'processing'].includes(order.fulfillmentStatus)) {
+    if (!['request', 'confirm', 'pending'].includes(order.status)) {
       throw createError(400, 'Order cannot be cancelled in current status');
     }
-    if (order.fulfillmentStatus !== 'cancelled') {
+    if (order.status !== 'canceled') {
       await restockItems(order.items);
     }
-    order.fulfillmentStatus = 'cancelled';
+    order.status = 'canceled';
     order.cancelledAt = new Date();
     await order.save();
     const employees = await User.find({ role: 'employee', isDeleted: { $ne: true }, status: { $ne: 'block' } });
@@ -288,7 +294,7 @@ export const cancelOrderItems = async (req, res, next) => {
     if (!Array.isArray(items) || items.length === 0) throw createError(400, 'Items required');
     const order = await Order.findById(id);
     if (!order) throw createError(404, 'Order not found');
-    if (!['pending', 'processing', 'shipped'].includes(order.fulfillmentStatus)) {
+    if (!['request', 'confirm', 'pending'].includes(order.status)) {
       throw createError(400, 'Order not cancellable in current status');
     }
     const restockList = [];

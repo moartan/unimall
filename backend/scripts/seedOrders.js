@@ -1,100 +1,131 @@
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
 import config from '../src/config/env.js';
 import Order from '../src/models/order/Order.js';
-import Product from '../src/models/catalog/Product.js';
-import User from '../src/models/auth/User.js';
 
-dotenv.config();
-
-const pickCustomer = async () => {
-  let customer = await User.findOne({ role: 'customer', isDeleted: { $ne: true } });
-  if (customer) return customer;
-
-  customer = await User.create({
-    name: 'Seed Customer',
-    email: 'seed.customer@example.com',
-    phone: '+252 61 000 0000',
-    password: 'Seed1234!',
-    role: 'customer',
-    status: 'active',
-  });
-  return customer;
-};
-
-const buildOrder = (user, products, blueprint) => {
-  const items = blueprint.items.map((i) => {
-    const p = products[i.index % products.length];
-    return {
-      product: p._id,
-      name: p.name,
-      quantity: i.qty,
-      price: p.salePrice,
-      regularPrice: p.regularPrice,
-      totalCost: p.totalCost,
-      image: p.images?.[0]?.url,
-    };
-  });
-
-  const subtotal = items.reduce((sum, it) => sum + it.price * it.quantity, 0);
-  const grandTotal = subtotal + (blueprint.shippingTotal || 0) - (blueprint.discountTotal || 0);
-
-  return {
-    user: user._id,
-    items,
-    subtotal,
-    grandTotal,
-    discountTotal: blueprint.discountTotal || 0,
-    taxTotal: blueprint.taxTotal || 0,
-    shippingTotal: blueprint.shippingTotal || 0,
-    paymentStatus: blueprint.paymentStatus,
-    fulfillmentStatus: blueprint.fulfillmentStatus,
-    transactionId: blueprint.transactionId || blueprint.paymentMethod || 'Online',
-    address: {
-      name: user.name || 'Customer',
-      phone: user.phone || '+252 61 000 0000',
-      line1: 'Seed Street 1',
-      city: 'Mogadishu',
-      country: 'SO',
-    },
-  };
-};
-
-const orderBlueprints = [
-  { paymentStatus: 'paid', fulfillmentStatus: 'delivered', transactionId: 'TXN-DEL-001', items: [{ index: 0, qty: 2 }, { index: 1, qty: 1 }] },
-  { paymentStatus: 'paid', fulfillmentStatus: 'shipped', transactionId: 'TXN-SHP-002', items: [{ index: 1, qty: 1 }, { index: 2, qty: 2 }] },
-  { paymentStatus: 'pending', fulfillmentStatus: 'processing', transactionId: 'TXN-PROC-003', items: [{ index: 2, qty: 1 }] },
-  { paymentStatus: 'failed', fulfillmentStatus: 'pending', transactionId: 'TXN-FAIL-004', items: [{ index: 3, qty: 1 }] },
-  { paymentStatus: 'paid', fulfillmentStatus: 'cancelled', transactionId: 'TXN-CAN-005', items: [{ index: 0, qty: 1 }] },
-  // New seeds
-  { paymentStatus: 'paid', fulfillmentStatus: 'delivered', transactionId: 'CASH-006', paymentMethod: 'Cash on Delivery', items: [{ index: 4, qty: 3 }] },
-  { paymentStatus: 'paid', fulfillmentStatus: 'returned', transactionId: 'TXN-RET-007', items: [{ index: 1, qty: 1 }, { index: 2, qty: 1 }] },
-  { paymentStatus: 'paid', fulfillmentStatus: 'shipped', transactionId: 'TXN-SHP-008', items: [{ index: 3, qty: 2 }] },
-  { paymentStatus: 'pending', fulfillmentStatus: 'processing', transactionId: 'TXN-PROC-009', items: [{ index: 0, qty: 1 }, { index: 2, qty: 1 }] },
-  { paymentStatus: 'paid', fulfillmentStatus: 'delivered', transactionId: 'TXN-DEL-010', items: [{ index: 4, qty: 1 }, { index: 1, qty: 1 }] },
+const USERS = [
+  '694280f6c197df5d614394fc',
+  '6942e994ab2fc3ddd04748b4',
 ];
 
-const run = async () => {
-  await mongoose.connect(config.mongoUri);
-  console.log('Connected to MongoDB');
+const statusList = [
+  'request',
+  'confirm',
+  'preparing',
+  'in_transit',
+  'delivered',
+  'canceled',
+  'pending',
+  'return',
+];
 
-  const customer = await pickCustomer();
-  const products = await Product.find({ isDeleted: { $ne: true } }).limit(5);
-  if (!products.length) {
-    throw new Error('No products found to seed orders. Seed products first.');
-  }
-
-  for (const blueprint of orderBlueprints) {
-    const orderData = buildOrder(customer, products, blueprint);
-    const order = await Order.create(orderData);
-    console.log(`Seeded order ${order.orderCode} (${order.paymentStatus} / ${order.fulfillmentStatus})`);
-  }
-
-  await mongoose.disconnect();
-  console.log('Order seeding complete.');
+const address = {
+  name: 'Seed User',
+  phone: '+254700000000',
+  line1: '123 Demo Street',
+  city: 'Nairobi',
+  state: 'Nairobi',
+  country: 'Kenya',
 };
 
-run().catch((err) => {
-  console.error('Seeding failed', err);
-  mongoose.disconnect();
-});
+const sampleItems = [
+  {
+    product: new mongoose.Types.ObjectId(),
+    name: 'Demo Product',
+    quantity: 1,
+    price: 49.99,
+    regularPrice: 59.99,
+    totalCost: 20,
+    image: '',
+  },
+  {
+    product: new mongoose.Types.ObjectId(),
+    name: 'Another Item',
+    quantity: 2,
+    price: 19.5,
+    regularPrice: 25,
+    totalCost: 10,
+    image: '',
+  },
+];
+
+const computeTotals = (items) => {
+  const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const discountTotal = 0;
+  const taxTotal = Number((subtotal * 0.08).toFixed(2));
+  const shippingTotal = 5;
+  const grandTotal = Number((subtotal - discountTotal + taxTotal + shippingTotal).toFixed(2));
+  return { subtotal, discountTotal, taxTotal, shippingTotal, grandTotal };
+};
+
+const statusDates = (status) => {
+  const now = new Date();
+  const dates = { requestedAt: now };
+  if (status === 'confirm') {
+    dates.confirmedAt = now;
+  }
+  if (status === 'preparing') {
+    dates.confirmedAt = now;
+    dates.preparedAt = now;
+  }
+  if (status === 'in_transit') {
+    dates.confirmedAt = now;
+    dates.preparedAt = now;
+    dates.inTransitAt = now;
+  }
+  if (status === 'delivered') {
+    dates.confirmedAt = now;
+    dates.preparedAt = now;
+    dates.inTransitAt = now;
+    dates.deliveredAt = now;
+  }
+  if (status === 'canceled') {
+    dates.cancelledAt = now;
+  }
+  if (status === 'return') {
+    dates.confirmedAt = now;
+    dates.preparedAt = now;
+    dates.inTransitAt = now;
+    dates.deliveredAt = now;
+    dates.refundRequestedAt = now;
+  }
+  return dates;
+};
+
+const seedOrders = async () => {
+  const payloads = [];
+  statusList.forEach((status, idx) => {
+    const user = USERS[idx % USERS.length];
+    const items = sampleItems.map((item, i) => ({
+      ...item,
+      name: `${item.name} #${idx + 1}-${i + 1}`,
+    }));
+    const totals = computeTotals(items);
+    const dates = statusDates(status);
+    payloads.push({
+      user,
+      items,
+      ...totals,
+      status,
+      paymentStatus: status === 'confirm' || status === 'preparing' || status === 'in_transit' || status === 'delivered' || status === 'return' ? 'paid' : 'pending',
+      address,
+      notes: `Seed order with status ${status}`,
+      ...dates,
+    });
+  });
+
+  await Order.insertMany(payloads);
+  console.log(`Seeded ${payloads.length} orders`);
+};
+
+const run = async () => {
+  try {
+    await mongoose.connect(config.mongoUri);
+    await seedOrders();
+  } catch (err) {
+    console.error(err);
+  } finally {
+    await mongoose.connection.close();
+  }
+};
+
+run();
